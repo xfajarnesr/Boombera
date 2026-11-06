@@ -200,8 +200,7 @@ const senseAnim = 150;
   console.log(`Un error resta ${t0 - t1} s.`);
 
   // Fer el contrari del que toca al botó és error.
-  const box = await p.locator('#boto').boundingBox();
-  await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await p.locator('#boto').hover();
   await p.mouse.down();
   if (R.solucioBoto(b) === 'clic') {
     await p.waitForFunction(() => document.querySelector('#llum').dataset.color);

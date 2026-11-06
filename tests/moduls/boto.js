@@ -36,8 +36,8 @@ module.exports = {
   bomba(R, b) { assert.strictEqual(R.solucioBoto(b), oracle(b)); },
   llegeix: (p) => p.evaluate(() => ({ boto: { color: document.querySelector('#boto').dataset.color, paraula: document.querySelector('#boto').textContent } })),
   async resol(p, R, b) {
-    const box = await p.locator('#boto').boundingBox();
-    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    // hover() espera que el botó estigui quiet: si la càmera encara entra, el clic cauria fora.
+    await p.locator('#boto').hover();
     await p.mouse.down();
     if (R.solucioBoto(b) === 'clic') { await p.mouse.up(); return; }
     await p.waitForFunction(() => document.querySelector('#llum').dataset.color);
