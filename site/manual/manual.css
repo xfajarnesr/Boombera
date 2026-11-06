@@ -39,9 +39,8 @@ body { background: #3b3d3f; color-scheme: light; color: #000; font-family: var(-
 .paraules td { font-family: var(--titols); font-weight: 700; font-size: 13pt; letter-spacing: .05em; text-align: center; padding: .8mm 1mm; }
 .simbols { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1.2pt solid #000; border-left: 1.2pt solid #000; margin: 1mm 0 2mm; }
 .simbol { border-right: 1.2pt solid #000; border-bottom: 1.2pt solid #000; padding: 1mm 1mm .8mm; display: flex; flex-direction: column; align-items: center; text-align: center; break-inside: avoid; }
-.simbol svg { width: 13mm; height: 13mm; display: block; }
-.simbol .nom-simbol { font-size: 8.5pt; line-height: 1.1; min-height: 2.2em; display: flex; align-items: center; margin-top: .6mm; }
-.simbol strong { font-family: var(--titols); font-size: 17pt; line-height: 1; }
+.simbol svg { width: 16mm; height: 16mm; display: block; }
+.simbol strong { font-family: var(--titols); font-size: 17pt; line-height: 1; margin-top: 1mm; }
 .peu-full { margin-top: auto; padding-top: 4mm; display: flex; justify-content: space-between; font-size: 9.5pt; border-top: 1pt solid #000; }
 
 @media screen and (max-width: 800px) {
