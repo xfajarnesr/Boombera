@@ -9,15 +9,16 @@ function oracle(flaix, piles, errors, numero) {
   return c;
 }
 // Mira els flaixos de veritat, tal com els veuria qui desactiva.
-const observa = (p) => p.evaluate(() => new Promise((ok) => {
+const observa = (p) => p.evaluate(() => new Promise((ok, ko) => {
   const el = document.querySelector('#senyal');
+  const rellotge = setTimeout(() => { o.disconnect(); ko(new Error(`seqüència sense ronda sencera: n ${el.dataset.n}, fase ${document.body.dataset.fase}`)); }, 60000);
   let vist = [];
   const mira = () => {
     const i = Number(el.dataset.i); const llarg = Number(el.dataset.llarg);
     if (i === 0) vist = [];
     if (i !== vist.length) return;
     vist.push(el.dataset.color);
-    if (vist.length === llarg) { o.disconnect(); ok(vist); }
+    if (vist.length === llarg) { o.disconnect(); clearTimeout(rellotge); ok(vist); }
   };
   const o = new MutationObserver(mira);
   o.observe(el, { attributes: true, attributeFilter: ['data-n'] });

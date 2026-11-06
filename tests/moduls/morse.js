@@ -6,14 +6,16 @@ const CANALS = { TEMPS: 12, VOLTS: 17, RADAR: 23, PILOT: 28, METRE: 31, SEGON: 3
 const oracle = (paraula, numero, piles) => CANALS[paraula] + (numero % 2 ? -piles : piles);
 const desxifra = (senyals) => senyals.map((l) => ALFABET[l]).join('');
 // Mira la bombeta com qui desactiva: curt, llarg i pauses. Llegeix una volta sencera, de pausa llarga a pausa llarga.
-const observa = (p) => p.evaluate(() => new Promise((ok) => {
+// Si en 90 s no ha vist una volta sencera, falla i diu què ha vist, en lloc de quedar-se penjat.
+const observa = (p) => p.evaluate(() => new Promise((ok, ko) => {
   const el = document.querySelector('#morse');
+  const rellotge = setTimeout(() => { o.disconnect(); ko(new Error(`senyal sense volta sencera: estat ${el.dataset.estat}, n ${el.dataset.n}, fase ${document.body.dataset.fase}, fet ${document.querySelector('#fets').dataset.morse}`)); }, 90000);
   let lletres = null; let actual = '';
   const mira = () => {
     const e = el.dataset.estat;
     if (Number(el.dataset.n) === 1) { lletres = []; actual = ''; }
     if (e === 'paraula') {
-      if (lletres) { lletres.push(actual); o.disconnect(); ok(lletres); return; }
+      if (lletres) { lletres.push(actual); o.disconnect(); clearTimeout(rellotge); ok(lletres); return; }
       lletres = []; actual = ''; return;
     }
     if (!lletres) return;
