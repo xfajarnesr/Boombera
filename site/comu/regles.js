@@ -1,8 +1,9 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 7;
+  const VERSIO = 8;
 
-  const PARTIDA = { penalitzacio: 30, mantenirMs: 500 };
+  // La bomba té dues cares de sis espais. Amb pocs mòduls només es fa servir la del davant.
+  const PARTIDA = { penalitzacio: 30, mantenirMs: 500, espaisCara: 6, cares: 2, modulsUnaCara: 4, ranuresCara: 4 };
 
   // Cada nivell diu quins mòduls porta la bomba, de quant temps disposa i quants errors la fan petar.
   const NIVELLS = [
@@ -13,6 +14,8 @@
     { nom: 'Nivell 4', segons: 420, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'] },
     { nom: 'Nivell 5', segons: 480, errors: 2, moduls: ['cables', 'boto', 'memoria', 'simbols', 'laberint', 'morse'] },
     { nom: 'Nivell 6', segons: 480, errors: 2, moduls: ['cables', 'boto', 'memoria', 'simbols', 'interruptors', 'ratlles'] },
+    // Provisional: tots els mòduls, repartits entre les dues cares.
+    { nom: 'Nivell 7', segons: 570, errors: 3, moduls: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'] },
   ];
 
   const COLORS_CABLE = {
@@ -304,6 +307,30 @@
   const canalMorse = (b) => canalDe(b.morse.paraula) + (b.numero % 2 === 0 ? b.piles : -b.piles);
 
   const tria = (llista, rng) => llista[Math.floor(rng() * llista.length)];
+
+  /* ---------- Carcassa a les dues cares ---------- */
+  // Cada cara té quatre ranures a la capçalera, dues a cada banda del temporitzador.
+  // La sèrie, els portapiles i els indicadors hi van a l'atzar, i sempre n'hi ha a totes dues cares.
+  function generaRanures(rng, piles, indicadors) {
+    const parteix = piles >= 2 && rng() < 0.5;
+    const a = parteix ? 1 + Math.floor(rng() * (piles - 1)) : piles;
+    const portapiles = parteix ? [a, piles - a] : [piles];
+    const peces = [{ tipus: 'serie' }, ...portapiles.map((n) => ({ tipus: 'piles', n })), ...indicadors.map((_, i) => ({ tipus: 'indicador', i }))];
+    const total = PARTIDA.cares * PARTIDA.ranuresCara;
+    let llocs;
+    do { llocs = barreja([...Array(total).keys()], rng).slice(0, peces.length); }
+    while (new Set(llocs.map((l) => Math.floor(l / PARTIDA.ranuresCara))).size < PARTIDA.cares);
+    return peces.map((p, k) => ({ ...p, cara: Math.floor(llocs[k] / PARTIDA.ranuresCara), ranura: llocs[k] % PARTIDA.ranuresCara }));
+  }
+  // On va cada mòdul: amb pocs mòduls, tots davant; si no, a qualsevol de les dues cares, amb algun a cada cara.
+  function repartimentEspais(moduls, rng = Math.random) {
+    const per = PARTIDA.espaisCara;
+    const cares = moduls.length > PARTIDA.modulsUnaCara ? PARTIDA.cares : 1;
+    let espais;
+    do { espais = barreja([...moduls, ...Array(per * cares - moduls.length).fill(null)], rng); }
+    while (cares > 1 && [0, 1].some((c) => espais.slice(c * per, (c + 1) * per).every((x) => x === null)));
+    return [...espais, ...Array(per * (PARTIDA.cares - cares)).fill(null)];
+  }
   const senseMesDeDos = (c) => c.every((x) => c.filter((y) => y === x).length <= 2);
 
   const barreja = (llista, rng) => {
@@ -412,13 +439,14 @@
       morse: generaMorse(rng),
       interruptors: generaInterruptors(rng, carcassa),
       ratlles: generaRatlles(rng, carcassa),
+      ranures: generaRanures(rng, piles, indicadors),
     };
   }
 
   const api = {
     VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
-    reglaCables, solucioCables, solucioBoto, generaBomba,
+    reglaCables, solucioCables, solucioBoto, generaBomba, generaRanures, repartimentEspais,
     MODULS: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'],
     SEQUENCIA, saltsSequencia, sentitSequencia, respostaSequencia,
     MEMORIA, CATEGORIES_MEMORIA, REGLES_MEMORIA, categoriaMemoria, textMemoria, solucioMemoria,

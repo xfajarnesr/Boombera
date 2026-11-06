@@ -186,6 +186,20 @@ export function creaSo() {
     tall() { to(2100, 0.05, 'square', 0.07); },
     error() { to(92, 0.45, 'sawtooth', 0.32); to(97, 0.45, 'sawtooth', 0.28); },
     modul() { to(660, 0.14, 'triangle', 0.2); setTimeout(() => to(990, 0.22, 'triangle', 0.2), 110); },
+    // Gir: fregament de metall que s'arrossega i un cop sord quan la bomba torna a quedar quieta.
+    gir() {
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      const src = ctx.createBufferSource(); src.buffer = sorollBuffer(0.6);
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.6;
+      f.frequency.setValueAtTime(380, t); f.frequency.exponentialRampToValueAtTime(900, t + 0.3); f.frequency.exponentialRampToValueAtTime(300, t + 0.58);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.18); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      src.connect(f).connect(g).connect(mestre); src.start(t);
+      const o = ctx.createOscillator(); const og = ctx.createGain();
+      o.frequency.setValueAtTime(120, t + 0.58); o.frequency.exponentialRampToValueAtTime(48, t + 0.75);
+      og.gain.setValueAtTime(0.0001, t + 0.58); og.gain.exponentialRampToValueAtTime(0.3, t + 0.59); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+      o.connect(og).connect(mestre); o.start(t + 0.58); o.stop(t + 0.82);
+    },
     guanya() {
       atura(0.5);
       if (!ctx) return;

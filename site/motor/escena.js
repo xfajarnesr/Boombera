@@ -5,10 +5,16 @@ import { espaiBuit, etiqueta, ple, materials } from './peces.js';
 import { MODULS } from '../moduls/registre.js';
 
 const AMPLE = 12.8; const ALT = 8.7;
+const FONS = 2.2; // gruix de la bomba: distància entre la cara del davant i la de darrere
+// Espais de mòdul d'una cara. La bomba en té dues: els 6 primers són davant i els 6 següents, darrere.
 export const ESPAIS = [
   [-4.05, 0.72], [0, 0.72], [4.05, 0.72],
   [-4.05, -2.34], [0, -2.34], [4.05, -2.34],
 ];
+// Ranures de la carcassa a la capçalera de cada cara, dues a cada banda del temporitzador.
+const RANURES = [-5.05, -3.05, 3.05, 5.05];
+const GIR_MS = 620; // durada del gir
+const MARGE = 0.9; // espai a cada costat per al botó de girar
 
 export function creaEscena(canvas, senseMoviment) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -40,14 +46,20 @@ export function creaEscena(canvas, senseMoviment) {
     return l;
   });
 
-  const paret = new THREE.Mesh(new THREE.PlaneGeometry(90, 60), materials().paret);
-  paret.position.z = -1.6; paret.receiveShadow = true; scene.add(paret);
+  // La paret queda prou enrere perquè la bomba hi càpiga quan gira.
+  const paret = new THREE.Mesh(new THREE.PlaneGeometry(110, 70), materials().paret);
+  paret.position.z = -7; paret.receiveShadow = true; scene.add(paret);
 
-  const arrel = new THREE.Group(); scene.add(arrel);
+  // El gir es fa sobre el centre de la bomba: «eix» és el pivot, «arrel» porta la bomba amb la cara del davant a z = 0.
+  const eix = new THREE.Group(); eix.position.z = -FONS / 2; scene.add(eix);
+  const arrel = new THREE.Group(); arrel.position.z = FONS / 2; eix.add(arrel);
+  let cares = [];
+  const G = { cara: 0, angle: 0, de: 0, a: 0, t0: 0, girant: false, fiMs: -1e9 };
+  let avisaCara = () => {};
   const particules = new THREE.Group(); scene.add(particules);
   const textures = creaTexturesFoc();
 
-  let vista = { moduls: {}, peces: [], timer: null, errors: [], llums: [], casc: null };
+  let vista = { moduls: {}, peces: [], timers: [], errors: [], llums: [], casc: null };
   let intensitat = 0; let estat = 'repos'; let temps0 = performance.now();
   let tExplosio = 0; let sacseig = 0; let nivellFlaix = 0;
   const parts = []; const volen = [];
@@ -65,7 +77,7 @@ export function creaEscena(canvas, senseMoviment) {
     camera.aspect = w / h;
     const vfov = THREE.MathUtils.degToRad(camera.fov);
     const perAlt = (ALT + 0.8) / (2 * Math.tan(vfov / 2));
-    const perAmple = (AMPLE + 1) / (2 * Math.tan(vfov / 2) * camera.aspect);
+    const perAmple = (AMPLE + 1 + 2 * MARGE) / (2 * Math.tan(vfov / 2) * camera.aspect);
     dist = Math.max(perAlt, perAmple) + 0.4;
     camera.updateProjectionMatrix();
   }
@@ -85,22 +97,40 @@ export function creaEscena(canvas, senseMoviment) {
     parts.length = 0; volen.length = 0;
     dianes.clear();
     estat = 'repos'; tExplosio = 0; sacseig = 0; nivellFlaix = 0; flaixLlum.intensity = 0;
-    arrel.position.set(0, 0, 0); arrel.rotation.set(0, 0, 0);
+    arrel.position.set(0, 0, FONS / 2); arrel.rotation.set(0, 0, 0);
+    eix.position.set(0, 0, -FONS / 2); eix.rotation.set(0, 0, 0);
+    Object.assign(G, { cara: 0, angle: 0, de: 0, a: 0, girant: false, fiMs: -1e9 });
 
     const M = materials();
     const casc = creaCasc(M); arrel.add(casc);
+    // Cada cara és un grup: la de darrere està girada mitja volta, i així els seus mòduls es veuen drets quan es gira la bomba.
+    cares = [0, 1].map((c) => {
+      const g = new THREE.Group();
+      if (c === 1) { g.position.z = -FONS; g.rotation.y = Math.PI; }
+      g.add(creaFaceCasc(M));
+      arrel.add(g);
+      return g;
+    });
     const peces = [];
     const moduls = {};
-    ESPAIS.forEach(([x, y], n) => {
-      const nom = espais[n];
+    const timer = creaTimer();
+    const timers = []; const errors = [];
+    espais.forEach((nom, n) => {
+      const [x, y] = ESPAIS[n % ESPAIS.length];
       const g = nom ? MODULS[nom].crea3D(bomba) : espaiBuit();
       g.position.set(x, y, 0.03);
-      arrel.add(g); peces.push(g);
+      cares[Math.floor(n / ESPAIS.length)].add(g); peces.push(g);
       if (nom) moduls[nom] = g;
     });
-    const cap = creaCapcalera(bomba, versio, M); arrel.add(cap.grup); peces.push(cap.grup);
+    cares.forEach((grup, c) => {
+      const cap = creaCapcalera(bomba, versio, M, c, timer);
+      grup.add(cap.grup); peces.push(cap.grup);
+      timers.push(cap.timer); errors.push(cap.errors);
+    });
+    const balises = creaBalises(); balises.forEach((b) => arrel.add(b));
     arrel.traverse((o) => { if (o.isMesh && !o.userData.senseOmbra) { o.castShadow = true; o.receiveShadow = true; } });
-    vista = { moduls, peces, timer: cap.timer, errors: cap.errors, casc, balises: cap.balises };
+    cares[1].visible = false; // la cara amagada no es dibuixa: estalvia feina al PC
+    vista = { moduls, peces, timer, errors, casc, balises };
     entrada = senseMoviment ? 1 : 0;
     temps0 = performance.now();
     return vista;
@@ -113,8 +143,13 @@ export function creaEscena(canvas, senseMoviment) {
     return { x: (proj.x + 1) / 2 * canvas.clientWidth, y: (1 - proj.y) / 2 * canvas.clientHeight };
   }
   const a = new THREE.Vector3(); const b = new THREE.Vector3();
+  const caraDe = (obj) => { let o = obj; while (o && !cares.includes(o)) o = o.parent; return cares.indexOf(o); };
   function posaDianes() {
     dianes.forEach((d, el) => {
+      // Només es poden prémer les dianes de la cara que es veu, i cap mentre la bomba gira.
+      const amaga = G.girant || d.cara !== G.cara;
+      if (el.dataset.amagada !== String(amaga)) el.dataset.amagada = String(amaga);
+      if (amaga) return;
       d.obj.updateWorldMatrix(true, false);
       a.set(d.x - d.w / 2, d.y + d.h / 2, d.z).applyMatrix4(d.obj.matrixWorld);
       b.set(d.x + d.w / 2, d.y - d.h / 2, d.z).applyMatrix4(d.obj.matrixWorld);
@@ -142,7 +177,8 @@ export function creaEscena(canvas, senseMoviment) {
     }
 
     // Càmera
-    entrada = Math.min(1, entrada + dt / 1.1);
+    // L'entrada de la càmera va pel rellotge, no pels fotogrames: en un PC lent dura el mateix.
+    entrada = senseMoviment ? 1 : Math.min(1, Math.max(entrada, (performance.now() - temps0) / 1100));
     const e = 1 - Math.pow(1 - entrada, 3);
     ptr.sx += (ptr.x - ptr.sx) * Math.min(1, dt * 3); ptr.sy += (ptr.y - ptr.sy) * Math.min(1, dt * 3);
     const px = senseMoviment ? 0 : ptr.sx * 0.1; const py = senseMoviment ? 0 : ptr.sy * 0.07;
@@ -166,11 +202,49 @@ export function creaEscena(canvas, senseMoviment) {
     });
     document.documentElement.style.setProperty('--alarma', estat === 'joc' ? (quant * (0.35 + 0.65 * puls)).toFixed(3) : '0');
 
+    animaGir(performance.now());
     if (estat === 'petada') animaExplosio(dtReal);
     Object.values(vista.moduls).forEach((m) => m.userData.anima && m.userData.anima(dt));
 
     posaDianes();
     renderer.render(scene, camera);
+    // Les proves esperen aquest estat abans de prémer res: la càmera ha acabat d'entrar i la bomba no gira.
+    const quieta = String(entrada >= 1 && !G.girant && estat !== 'petada');
+    if (canvas.dataset.quieta !== quieta) canvas.dataset.quieta = quieta;
+  }
+
+  /* ---------- Gir ---------- */
+  // Mitja volta sobre l'eix vertical. La bomba se separa una mica de la paret, s'inclina amb el pes
+  // i en arribar fa un petit balanceig. La càmera no es mou, perquè no maregi.
+  const suau = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+  function gira(sentit = 1) {
+    if (G.girant || estat === 'petada') return false;
+    G.girant = true; G.de = G.angle; G.a = G.angle + sentit * Math.PI; G.t0 = performance.now();
+    cares.forEach((c) => { c.visible = true; });
+    dianes.forEach((d, el) => { el.dataset.amagada = 'true'; });
+    avisaCara(G.cara, true);
+    return true;
+  }
+  function animaGir(ara) {
+    if (G.girant) {
+      const u = Math.min(1, (ara - G.t0) / (senseMoviment ? 300 : GIR_MS));
+      const e = senseMoviment ? (u < 0.5 ? 0 : 1) : suau(u);
+      G.angle = G.de + (G.a - G.de) * e;
+      const arc = senseMoviment ? 0 : Math.sin(Math.PI * e);
+      eix.rotation.y = G.angle;
+      eix.rotation.x = -0.05 * arc;
+      eix.position.set(0, 0.18 * arc, -FONS / 2 + 1.6 * arc);
+      if (u >= 1) {
+        G.girant = false; G.fiMs = ara;
+        G.cara = Math.round(G.angle / Math.PI) % 2 === 0 ? 0 : 1;
+        cares.forEach((c, i) => { c.visible = i === G.cara || estat === 'petada'; });
+        avisaCara(G.cara, false);
+      }
+    } else if (!senseMoviment) {
+      // Balanceig curt en arribar: s'apaga en un terç de segon.
+      const w = (ara - G.fiMs) / 1000;
+      eix.rotation.y = G.angle + (w < 0.45 ? 0.035 * Math.sin(w * 15) * Math.exp(-w * 9) : 0);
+    }
   }
 
   /* ---------- Explosió ---------- */
@@ -185,11 +259,15 @@ export function creaEscena(canvas, senseMoviment) {
     estat = 'petada'; tExplosio = 0; sacseig = 1.8; nivellFlaix = 1;
     flaixLlum.intensity = 16000;
     const o = origen || new THREE.Vector3(0, 0, 1);
-    // Els panells surten disparats
+    cares.forEach((c) => { c.visible = true; });
+    // Els panells surten disparats. La velocitat es calcula al món i es passa a l'orientació de la cara on és cada panell.
+    const q = new THREE.Quaternion();
     vista.peces.forEach((g) => {
       const c = new THREE.Vector3(); g.getWorldPosition(c);
       const dir = c.clone().sub(o); dir.z = 0; const dl = dir.length() || 1; dir.divideScalar(dl);
-      volen.push({ g, v: new THREE.Vector3(dir.x * (9 + Math.random() * 12), dir.y * (7 + Math.random() * 9) + 4, 1 + Math.random() * 5), r: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 7) });
+      const v = new THREE.Vector3(dir.x * (9 + Math.random() * 12), dir.y * (7 + Math.random() * 9) + 4, 1 + Math.random() * 5);
+      g.parent.getWorldQuaternion(q); v.applyQuaternion(q.invert());
+      volen.push({ g, v, r: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 7) });
     });
     // El buc queda socarrimat
     vista.casc.traverse((m) => {
@@ -253,22 +331,38 @@ export function creaEscena(canvas, senseMoviment) {
       estat = 'salvada';
       alarmes.forEach((l) => { l.intensity = 0; });
     },
-    diana(el, obj, x, y, w, h, z = 0.2) { dianes.set(el, { obj, x, y, w, h, z }); },
+    diana(el, obj, x, y, w, h, z = 0.2) {
+      const cara = caraDe(obj);
+      el.dataset.cara = cara; el.dataset.amagada = String(G.girant || cara !== G.cara);
+      dianes.set(el, { obj, x, y, w, h, z, cara });
+    },
+    gira,
+    get cara() { return G.cara; },
+    get girant() { return G.girant; },
+    caraDeModul(nom) { return vista.moduls[nom] ? caraDe(vista.moduls[nom]) : -1; },
+    enCanviCara(f) { avisaCara = f; },
     posaTemps(text, vermell) { if (vista.timer) vista.timer.userData.dibuixa(text, vermell); },
-    posaErrors(n) { vista.errors.forEach((m, i) => { m.material.emissiveIntensity = i < n ? 3.2 : 0; m.material.color.set(i < n ? 0xff2a1a : 0x3a2320); }); },
+    posaErrors(n) { vista.errors.flat().forEach((m) => { const i = m.userData.i; m.material.emissiveIntensity = i < n ? 3.2 : 0; m.material.color.set(i < n ? 0xff2a1a : 0x3a2320); }); },
     origenDe(nom) { const g = vista.moduls[nom]; const p = new THREE.Vector3(); if (g) g.getWorldPosition(p); return p; },
     get moduls() { return vista.moduls; },
   };
 
   /* ---------- Carcassa ---------- */
+  // El buc és una caixa gruixuda amb el cantell arrodonit, que es veu quan la bomba gira.
   function creaCasc(M) {
     const g = new THREE.Group();
     const s = rectArrod(AMPLE, ALT, 0.32);
-    const cos = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 1.6, bevelEnabled: true, bevelSize: 0.1, bevelThickness: 0.1, bevelSegments: 3, curveSegments: 8 }), M.acer);
-    cos.position.z = -1.7; g.add(cos);
-    const barra = (w, h, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.05), M.acerFosc); m.position.set(x, y, 0.02); g.add(m); };
-    barra(AMPLE - 0.7, 0.05, 0, 2.47);
-    // Reblons del perímetre
+    const cos = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: FONS - 0.2, bevelEnabled: true, bevelSize: 0.1, bevelThickness: 0.1, bevelSegments: 3, curveSegments: 8 }), M.acer);
+    cos.position.z = -FONS + 0.1; g.add(cos);
+    // Junta del mig del cantell: diu que són dues meitats cargolades.
+    const junta = new THREE.Mesh(new THREE.ExtrudeGeometry(rectArrod(AMPLE + 0.24, ALT + 0.24, 0.42), { depth: 0.16, bevelEnabled: false, curveSegments: 8 }), M.acerFosc);
+    junta.position.z = -FONS / 2 - 0.08; g.add(junta);
+    return g;
+  }
+  // El que porta cada cara a sobre del buc: la ratlla de sota la capçalera i els reblons del perímetre.
+  function creaFaceCasc(M) {
+    const g = new THREE.Group();
+    const barra = new THREE.Mesh(new THREE.BoxGeometry(AMPLE - 0.7, 0.05, 0.05), M.acerFosc); barra.position.set(0, 2.47, 0.02); g.add(barra);
     const reb = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 12, 8), M.reblo, 44);
     const d = new THREE.Object3D(); let i = 0;
     for (let k = 0; k < 13; k++) {
@@ -282,63 +376,73 @@ export function creaEscena(canvas, senseMoviment) {
     reb.count = i; g.add(reb);
     return g;
   }
+  // Balises d'alarma als dos costats, a mig gruix: es veuen des de totes dues cares.
+  function creaBalises() {
+    return [-1, 1].map((s2) => {
+      const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 5.4, 6, 12), new THREE.MeshStandardMaterial({ color: 0x4a0d08, emissive: 0xff1a0a, emissiveIntensity: 0.25, roughness: 0.25 }));
+      m.material.userData.propi = true;
+      m.position.set(s2 * (AMPLE / 2 + 0.2), -0.3, -FONS / 2);
+      return m;
+    });
+  }
 
-  function creaCapcalera(bomba, versio, M) {
+  // Capçalera d'una cara: temporitzador i errors al mig (iguals a totes dues cares) i les peces de la carcassa
+  // que hagin tocat a aquesta cara, cada una a la seva ranura.
+  function creaCapcalera(bomba, versio, M, cara, timerBase) {
     const g = new THREE.Group();
     const Y = 3.12;
     const banda = new THREE.Mesh(new THREE.BoxGeometry(AMPLE - 0.55, 1.72, 0.03), M.banda); banda.position.set(0, Y + 0.09, 0.015); g.add(banda);
-    // Placa de sèrie
-    const rot = etiqueta('Núm. de sèrie', { alt: 0.2, color: '#cfd2cc' }); rot.position.set(-5.3 + 0.62, Y + 0.56, 0.06); g.add(rot);
-    const pl = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.72, 0.06), M.llauto); pl.position.set(-4.75, Y - 0.02, 0.04); g.add(pl);
-    const num = etiqueta(`${bomba.lletres}-${bomba.numero}`, { alt: 0.52, color: '#14120c', font: 'Barlow Condensed', pes: 700, senseLlum: false }); num.position.set(-4.75, Y - 0.02, 0.08); g.add(num);
-    [[-5.8, 0.24], [-3.7, 0.24], [-5.8, -0.28], [-3.7, -0.28]].forEach(([x, dy]) => { const r = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), M.reblo); r.position.set(x, Y + dy - 0.02, 0.08); g.add(r); });
+    const rotol = (text, x) => { const r = etiqueta(text, { alt: 0.2, color: '#cfd2cc' }); r.position.set(x, Y + 0.56, 0.06); g.add(r); };
 
-    // Piles
-    const rp = etiqueta('Piles', { alt: 0.2, color: '#cfd2cc' }); rp.position.set(-2.72, Y + 0.56, 0.06); g.add(rp);
-    const bress = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.82, 0.08), M.acerFosc); bress.position.set(-2.72, Y - 0.03, 0.02); g.add(bress);
-    for (let i = 0; i < bomba.piles; i++) {
-      const x = -2.72 - 0.48 + i * 0.32;
-      const p = ple(new THREE.CylinderGeometry(0.115, 0.115, 0.56, 16), M.pila); p.position.set(x, Y - 0.08, 0.13); g.add(p);
-      const c = ple(new THREE.CylinderGeometry(0.115, 0.115, 0.1, 16), M.llauto); c.position.set(x, Y + 0.24, 0.13); g.add(c);
-      const t = ple(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 10), M.reblo); t.position.set(x, Y + 0.31, 0.13); g.add(t);
-    }
+    const peces = {
+      serie(x) {
+        rotol('Núm. de sèrie', x);
+        const pl = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.66, 0.06), M.llauto); pl.position.set(x, Y - 0.04, 0.04); g.add(pl);
+        const num = etiqueta(`${bomba.lletres}-${bomba.numero}`, { alt: 0.46, color: '#14120c', font: 'Barlow Condensed', pes: 700, senseLlum: false });
+        num.position.set(x, Y - 0.04, 0.08); g.add(num);
+        [[-0.8, 0.24], [0.8, 0.24], [-0.8, -0.24], [0.8, -0.24]].forEach(([dx, dy]) => { const r = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), M.reblo); r.position.set(x + dx, Y + dy - 0.04, 0.08); g.add(r); });
+      },
+      piles(x, { n }) {
+        rotol('Piles', x);
+        const am = 0.3 + n * 0.32;
+        const bress = new THREE.Mesh(new THREE.BoxGeometry(am, 0.82, 0.08), M.acerFosc); bress.position.set(x, Y - 0.03, 0.02); g.add(bress);
+        for (let i = 0; i < n; i++) {
+          const px = x - (n - 1) * 0.16 + i * 0.32;
+          const p = ple(new THREE.CylinderGeometry(0.115, 0.115, 0.56, 16), M.pila); p.position.set(px, Y - 0.08, 0.13); g.add(p);
+          const c = ple(new THREE.CylinderGeometry(0.115, 0.115, 0.1, 16), M.llauto); c.position.set(px, Y + 0.24, 0.13); g.add(c);
+          const t = ple(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 10), M.reblo); t.position.set(px, Y + 0.31, 0.13); g.add(t);
+        }
+      },
+      indicador(x, { i }) {
+        const ind = bomba.indicadors[i];
+        rotol('Indicador', x);
+        const led = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10), new THREE.MeshStandardMaterial({ color: ind.ences ? 0xfff0a0 : 0x2a2d2a, emissive: ind.ences ? 0xffdf70 : 0, emissiveIntensity: ind.ences ? 3 : 0, roughness: 0.3 }));
+        led.material.userData.propi = true;
+        led.position.set(x - 0.46, Y + 0.12, 0.06); g.add(led);
+        const et = etiqueta(ind.etiqueta, { alt: 0.32, color: '#f1efe6', font: 'Barlow Condensed', pes: 700 }); et.position.set(x + 0.16, Y + 0.12, 0.05); g.add(et);
+        const es = etiqueta(ind.ences ? 'encès' : 'apagat', { alt: 0.2, color: ind.ences ? '#ffe9a0' : '#9a9d97' }); es.position.set(x, Y - 0.27, 0.05); g.add(es);
+        if (ind.ences) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.foc, color: 0xffdf70, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(0.66); gl.position.copy(led.position).setZ(0.1); g.add(gl); }
+      },
+    };
+    bomba.ranures.filter((r) => r.cara === cara).forEach((r) => peces[r.tipus](RANURES[r.ranura], r));
 
-    // Temporitzador
-    const caixa = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.28, 0.2), M.acerFosc); caixa.position.set(0, Y - 0.02, 0.08); g.add(caixa);
-    const timer = creaTimer(); timer.position.set(0, Y - 0.02, 0.185); g.add(timer);
+    // Temporitzador i errors, al mig. Les dues cares comparteixen la mateixa pantalla.
+    const caixa = new THREE.Mesh(new THREE.BoxGeometry(4.0, 1.28, 0.2), M.acerFosc); caixa.position.set(0, Y - 0.02, 0.08); g.add(caixa);
+    const timer = cara === 0 ? timerBase : new THREE.Mesh(timerBase.geometry, timerBase.material);
+    timer.userData.senseOmbra = true;
+    timer.position.set(-0.5, Y - 0.02, 0.185); g.add(timer);
     const vidre = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 1.08), new THREE.MeshStandardMaterial({ color: 0x223, transparent: true, opacity: 0.1, roughness: 0.05, metalness: 0.7 }));
-    vidre.position.set(0, Y - 0.02, 0.2); vidre.userData.senseOmbra = true; g.add(vidre);
-
-    // Indicadors
-    const ri = etiqueta('Indicadors', { alt: 0.2, color: '#cfd2cc' }); ri.position.set(2.6, Y + 0.56, 0.06); g.add(ri);
-    bomba.indicadors.forEach((ind, i) => {
-      const x = 2.1 + i * 1.05;
-      const led = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), new THREE.MeshStandardMaterial({ color: ind.ences ? 0xfff0a0 : 0x2a2d2a, emissive: ind.ences ? 0xffdf70 : 0, emissiveIntensity: ind.ences ? 3 : 0, roughness: 0.3 }));
-      led.material.userData.propi = true;
-      led.position.set(x - 0.26, Y + 0.14, 0.06); g.add(led);
-      const et = etiqueta(ind.etiqueta, { alt: 0.26, color: '#f1efe6', font: 'Barlow Condensed', pes: 700 }); et.position.set(x + 0.12, Y + 0.14, 0.05); g.add(et);
-      const es = etiqueta(ind.ences ? 'encès' : 'apagat', { alt: 0.19, color: ind.ences ? '#ffe9a0' : '#9a9d97' }); es.position.set(x - 0.02, Y - 0.2, 0.05); g.add(es);
-      if (ind.ences) { const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.foc, color: 0xffdf70, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })); gl.scale.setScalar(0.6); gl.position.copy(led.position).setZ(0.1); g.add(gl); }
-    });
-
-    // Errors
-    const re = etiqueta('Errors', { alt: 0.2, color: '#cfd2cc' }); re.position.set(4.95, Y + 0.56, 0.06); g.add(re);
+    vidre.material.userData.propi = true;
+    vidre.position.set(-0.5, Y - 0.02, 0.2); vidre.userData.senseOmbra = true; g.add(vidre);
+    const re = etiqueta('Errors', { alt: 0.18, color: '#cfd2cc' }); re.position.set(1.5, Y + 0.36, 0.19); g.add(re);
     const errors = [0, 1, 2].map((i) => {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), new THREE.MeshStandardMaterial({ color: 0x3a2320, emissive: 0xff2010, emissiveIntensity: 0, roughness: 0.25 }));
-      m.material.userData.propi = true; m.scale.z = 0.6;
-      m.position.set(4.45 + i * 0.5, Y + 0.08, 0.05); g.add(m);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), new THREE.MeshStandardMaterial({ color: 0x3a2320, emissive: 0xff2010, emissiveIntensity: 0, roughness: 0.25 }));
+      m.material.userData.propi = true; m.scale.z = 0.6; m.userData.i = i;
+      m.position.set(1.16 + i * 0.34, Y + 0.02, 0.2); g.add(m);
       return m;
     });
-    const rv = etiqueta(`Regles v${versio}`, { alt: 0.16, color: '#8e918b' }); rv.position.set(4.95, Y - 0.34, 0.06); g.add(rv);
-
-    // Balises d'alarma
-    const balises = [-1, 1].map((s2) => {
-      const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 5.4, 6, 12), new THREE.MeshStandardMaterial({ color: 0x4a0d08, emissive: 0xff1a0a, emissiveIntensity: 0.25, roughness: 0.25 }));
-      m.material.userData.propi = true;
-      m.position.set(s2 * (AMPLE / 2 + 0.2), -0.3, 0); g.add(m);
-      return m;
-    });
-    return { grup: g, timer, errors, balises };
+    const rv = etiqueta(`Regles v${versio}`, { alt: 0.15, color: '#8e918b' }); rv.position.set(1.5, Y - 0.38, 0.19); g.add(rv);
+    return { grup: g, timer, errors };
   }
 
   function creaTimer() {

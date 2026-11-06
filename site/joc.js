@@ -18,6 +18,7 @@ async function arrenca() {
   await Promise.all(['700 96px "Barlow Condensed"'].map((f) => document.fonts.load(f).catch(() => {})));
   try {
     esc = creaEscena($('#escena'), senseMoviment);
+    esc.enCanviCara(posaCara);
   } catch (e) {
     $('#sense3d').hidden = false;
     $('#nota').hidden = true;
@@ -27,19 +28,14 @@ async function arrenca() {
   pintaNivells();
 }
 
-function barreja(llista) {
-  const a = [...llista];
-  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
-}
-
 function novaBomba(nivell) {
   aturaModuls();
   S.nivell = nivell;
   S.b = R.generaBomba();
   Object.assign(S, { errors: 0, fets: new Set(), controls: [], ultim: null, quiet: nivell.segons * 1000 });
-  const espais = barreja([...nivell.moduls, ...Array(6 - nivell.moduls.length).fill(null)]);
-  esc.construeix(S.b, espais, R.VERSIO);
+  esc.construeix(S.b, R.repartimentEspais(nivell.moduls), R.VERSIO);
+  premut = false;
+  posaCara(0, false);
   $('#dianes').innerHTML = '';
   $('#dades-moduls').innerHTML = '';
   S.controls = nivell.moduls.map((nom) => MODULS[nom].creaJoc(contextDe(nom)));
@@ -71,11 +67,28 @@ function contextDe(nom) {
 }
 
 /* ---------- Dades per a lectors de pantalla ---------- */
+// La carcassa només es pot llegir des de la cara on és cada peça, igual que a la pantalla.
+function pintaCarcassa() {
+  const b = S.b; const veu = (c) => !esc.girant && esc.cara === c;
+  $('#carcassa').innerHTML = b.ranures.map((r) => {
+    const v = veu(r.cara);
+    const at = `class="peca" data-tipus="${r.tipus}" data-cara="${r.cara}" data-ranura="${r.ranura}" data-veu="${v}"`;
+    if (!v) return `<li ${at}></li>`;
+    if (r.tipus === 'serie') return `<li ${at} data-valor="${b.lletres}-${b.numero}">Número de sèrie: ${b.lletres}-${b.numero}</li>`;
+    if (r.tipus === 'piles') return `<li ${at} data-n="${r.n}">Portapiles amb ${r.n === 1 ? '1 pila' : `${r.n} piles`}</li>`;
+    const ind = b.indicadors[r.i];
+    return `<li ${at} data-etiqueta="${ind.etiqueta}" data-ences="${ind.ences}">Indicador ${ind.etiqueta}: ${ind.ences ? 'encès' : 'apagat'}</li>`;
+  }).join('');
+}
+function posaCara(cara, girant) {
+  document.body.dataset.cara = cara;
+  document.body.dataset.girant = girant;
+  $('#cara').textContent = girant ? 'Girant la bomba' : `Cara ${cara === 0 ? 'del davant' : 'de darrere'}`;
+  if (S.b) pintaCarcassa();
+}
 function pintaDades() {
-  const b = S.b;
-  $('#serie').textContent = `${b.lletres}-${b.numero}`;
-  const p = $('#piles'); p.textContent = String(b.piles); p.dataset.n = b.piles;
-  $('#indicadors').innerHTML = b.indicadors.map((i) => `<li class="indicador" data-ences="${i.ences}">${i.etiqueta}: ${i.ences ? 'encès' : 'apagat'}</li>`).join('');
+  pintaCarcassa();
+  $('#espais').innerHTML = S.nivell.moduls.map((m) => { const c = esc.caraDeModul(m); return `<li data-modul="${m}" data-cara="${c}">${m}: cara ${c === 0 ? 'del davant' : 'de darrere'}</li>`; }).join('');
   pintaErrors(); pintaTemps(); pintaFets();
   $('#estat').textContent = 'Partida a punt';
 }
@@ -217,6 +230,36 @@ btPantalla.addEventListener('click', () => {
 });
 document.addEventListener('fullscreenchange', pintaPantalla);
 pintaPantalla();
+
+/* ---------- Girar la bomba ---------- */
+// Les dianes de la cara amagada, i totes mentre gira, no reben res: s'aturen abans d'arribar al mòdul.
+let premut = false;
+const amagada = (d) => esc && (esc.girant || Number(d.dataset.cara) !== esc.cara);
+['pointerdown', 'mousedown', 'touchstart', 'click', 'dblclick', 'keydown'].forEach((tipus) => {
+  $('#dianes').addEventListener(tipus, (e) => {
+    const d = e.target.closest && e.target.closest('.diana');
+    if (d && amagada(d)) { e.stopImmediatePropagation(); e.preventDefault(); return; }
+    // No es pot girar mentre es manté premut un botó.
+    if (d && (tipus === 'pointerdown' || (tipus === 'keydown' && (e.key === ' ' || e.key === 'Enter')))) premut = true;
+  }, true);
+});
+['pointerup', 'pointercancel', 'blur'].forEach((tipus) => window.addEventListener(tipus, () => { premut = false; }, true));
+window.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') premut = false; }, true);
+
+function gira(sentit) {
+  if (S.fase !== 'joc' || premut || !esc) return;
+  if (!esc.gira(sentit)) return;
+  so.gir();
+  if (senseMoviment) { document.body.classList.remove('fos'); void document.body.offsetWidth; document.body.classList.add('fos'); }
+}
+const btGira = $('#gira');
+btGira.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="full-bomba" x="17" y="9" width="14" height="30" rx="2"/><path d="M12.5 30.5A13 6 0 0 1 9 24c0-3.3 6.7-6 15-6s15 2.7 15 6-6.7 6-15 6"/><path d="M28.5 26.2 24 30l4.6 3.6"/></svg><span class="punts" aria-hidden="true"><i></i><i></i></span>';
+btGira.addEventListener('click', () => gira(1));
+document.addEventListener('keydown', (e) => {
+  if (e.repeat || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+  e.preventDefault();
+  gira(e.key === 'ArrowLeft' ? -1 : 1);
+});
 
 /* ---------- Rellotge ---------- */
 let tics = 0;

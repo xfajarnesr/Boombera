@@ -19,15 +19,17 @@
 
   <div class="dades-ocultes">
     <h1>Boombera</h1>
-    <p>Número de sèrie: <span id="serie"></span></p>
-    <p>Piles: <span id="piles"></span></p>
-    <ul id="indicadors"></ul>
+    <p id="cara" aria-live="polite"></p>
+    <ul id="carcassa"></ul>
+    <ul id="espais"></ul>
     <p>Temps: <span id="temps" role="timer"></span></p>
     <p>Errors: <span id="errors"></span></p>
     <div id="dades-moduls"></div>
     <p id="fets"></p>
     <p id="estat" aria-live="assertive"></p>
   </div>
+
+  <button id="gira" type="button" aria-label="Gira la bomba" title="Gira la bomba"></button>
 
   <div id="controls">
     <button id="so" type="button" aria-pressed="true"></button>
