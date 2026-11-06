@@ -1,20 +1,13 @@
 @font-face { font-family: "Atkinson Hyperlegible"; font-weight: 400; font-display: swap; src: url("fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "Atkinson Hyperlegible"; font-weight: 700; font-display: swap; src: url("fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url("fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
-@font-face { font-family: "Patrick Hand"; font-weight: 400; font-display: swap; src: url("fonts/patrick-hand-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Saira Stencil One"; font-weight: 400; font-display: swap; src: url("fonts/saira-stencil-one-latin-400-normal.woff2") format("woff2"); }
 
 :root {
-  --placa: #123f33;
-  --placa-fosca: #0c2d25;
-  --coure: #c98a46;
-  --proto: #d9d7c6;
-  --cinta: #ecdca8;
-  --tinta: #1b1b1b;
-  --ambre: #ffb31a;
-  --mans: "Patrick Hand", "Segoe Print", cursive;
+  --estargit: "Saira Stencil One", "Arial Narrow", sans-serif;
   --titols: "Barlow Condensed", "Arial Narrow", sans-serif;
   --text: "Atkinson Hyperlegible", Verdana, sans-serif;
-  color-scheme: light;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }

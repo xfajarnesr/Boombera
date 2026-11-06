@@ -9,4 +9,6 @@ Joc d'aula en català inspirat en la idea de desactivar una bomba parlant. Parla
 - Abans de programar un mòdul nou, proposa'n les regles a Xavi i espera que les validi.
 - Incrementa `VERSIO` a `regles.js` quan canviïn les regles, perquè la placa i el manual ho mostren.
 - Els canvis van en branques, i a `main` només el que Xavi hagi aprovat. `main` es publica sol.
+- L'estil és blindatge fosc en penombra, en 3D: res de taller ni de cinta de pintor. Els colors i textos dels mòduls s'han de llegir d'un cop d'ull.
+- Els nivells no porten el nom de cap curs.
 - Passa `npm test` abans de pujar res.

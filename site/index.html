@@ -6,68 +6,41 @@
 <title>Curtcircuit</title>
 <link rel="stylesheet" href="comu/comu.css">
 <link rel="stylesheet" href="joc.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
 </head>
-<body>
-<div class="barra">
-  <span class="logo">Curtcircuit</span>
+<body data-fase="inici">
+<main id="bomba">
+  <canvas id="escena" aria-hidden="true"></canvas>
+  <div id="alarma" aria-hidden="true"></div>
+  <div id="flaix" aria-hidden="true"></div>
+  <div id="sutge" aria-hidden="true"></div>
+  <div id="esquerdes" aria-hidden="true"></div>
+  <div id="dianes"></div>
+
+  <div class="dades-ocultes">
+    <h1>Curtcircuit</h1>
+    <p>Número de sèrie: <span id="serie"></span></p>
+    <p>Piles: <span id="piles"></span></p>
+    <ul id="indicadors"></ul>
+    <p>Temps: <span id="temps" role="timer"></span></p>
+    <p>Errors: <span id="errors"></span></p>
+    <p id="llum" aria-live="polite">Llum apagada</p>
+    <p id="fets"></p>
+    <p id="estat" aria-live="assertive"></p>
+  </div>
+
   <button id="so" type="button">Apaga el so</button>
-</div>
 
-<main id="vista-joc">
-  <section id="bomba" class="placa" aria-label="Bomba">
-    <div class="capcalera">
-      <div class="dada serie-bloc">
-        <span class="serigrafia">Núm. de sèrie</span>
-        <strong id="serie" class="adhesiu">QTX-47</strong>
-      </div>
-      <div class="dada">
-        <span class="serigrafia">Piles</span>
-        <div id="piles" class="piles" role="img"></div>
-      </div>
-      <div id="timer" class="timer">
-        <svg id="timer-svg" viewBox="0 0 142 60" role="timer"></svg>
-      </div>
-      <div class="dada">
-        <span class="serigrafia">Indicadors</span>
-        <div id="indicadors" class="indicadors"></div>
-      </div>
-      <div class="dada">
-        <span class="serigrafia">Errors: <span id="errors-text">0 de 3</span></span>
-        <div id="errors" class="errors"></div>
-        <span class="serigrafia versio">Regles <span data-versio>v1</span></span>
-      </div>
+  <section id="nota" aria-labelledby="nota-titol">
+    <h2 id="nota-titol">Curtcircuit</h2>
+    <div id="nota-text">
+      <p>Seieu d'esquena. Qui desactiva veu aquesta pantalla, qui fa d'expert té el manual, i només podeu parlar.</p>
     </div>
-    <div class="moduls">
-      <section id="mod-cables" class="modul" aria-label="Mòdul de cables">
-        <h2 class="cinta titol-modul">Cables</h2><span class="led-modul" aria-hidden="true"></span><span class="fet-text cinta">fet</span>
-        <svg id="cables-svg" viewBox="0 0 340 244"></svg>
-      </section>
-      <section id="mod-boto" class="modul" aria-label="Mòdul del botó">
-        <h2 class="cinta titol-modul">Botó</h2><span class="led-modul" aria-hidden="true"></span><span class="fet-text cinta">fet</span>
-        <div class="boto-zona">
-          <div class="boto-peu">
-            <button id="boto" type="button">ARA</button>
-            <span id="boto-color" class="cinta">botó blau</span>
-          </div>
-          <div class="llum-peu">
-            <span id="llum" class="llum"></span>
-            <span id="llum-nom" class="cinta" aria-live="polite">llum apagada</span>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div id="nota" class="nota">
-      <h1 id="nota-titol">Curtcircuit</h1>
-      <div id="nota-text">
-        <p>Seieu d'esquena. Qui desactiva veu aquesta pantalla, qui fa d'expert té el manual imprès, i només podeu parlar.</p>
-        <p>Desactiveu els dos mòduls abans que s'acabi el temps. Al tercer error, la bomba peta.</p>
-      </div>
-      <button id="comenca" type="button">Comença la partida</button>
-    </div>
+    <div id="nivells"></div>
   </section>
+  <p id="sense3d" hidden>Aquest ordinador no pot mostrar gràfics 3D. Prova-ho amb un altre navegador o activa l'acceleració gràfica.</p>
 </main>
-
 <script src="comu/regles.js"></script>
-<script src="joc.js"></script>
+<script type="module" src="joc.js"></script>
 </body>
 </html>

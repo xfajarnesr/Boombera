@@ -11,7 +11,9 @@ Joc d'aula per parelles, en català. Qui desactiva veu la bomba a la pantalla, q
 És una web estàtica, sense servidor ni compilació. Tot el que es publica és a `site/`.
 
 - `site/comu/regles.js`: l'única font de les regles. La fan servir el joc, el manual i les proves.
-- `site/index.html`, `joc.js` i `joc.css`: la bomba.
+- `site/index.html`, `joc.js` i `joc.css`: la partida.
+- `site/motor/`: l'escena 3D, els mòduls en 3D i el so, generat al navegador.
+- `site/vendor/`: la biblioteca Three.js.
 - `site/manual/`: el manual imprimible. El joc no hi enllaça.
 - `tests/`: comprova totes les combinacions de regles i juga partides reals al navegador.
 
@@ -28,4 +30,4 @@ Cada canvi a `main` passa les proves, genera el PDF i es publica a GitHub Pages.
 
 ## Tipografies
 
-Atkinson Hyperlegible, Barlow Condensed i Patrick Hand, amb les seves llicències a `site/comu/fonts/`.
+Atkinson Hyperlegible, Barlow Condensed i Saira Stencil One, amb les seves llicències a `site/comu/fonts/`.

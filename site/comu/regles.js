@@ -1,8 +1,15 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 1;
+  const VERSIO = 2;
 
-  const PARTIDA = { segons: 180, errorsMax: 3, penalitzacio: 30, mantenirMs: 500 };
+  const PARTIDA = { penalitzacio: 30, mantenirMs: 500 };
+
+  // Cada nivell diu quins mòduls porta la bomba, de quant temps disposa i quants errors la fan petar.
+  const NIVELLS = [
+    { nom: 'Nivell 1', segons: 240, errors: 3, moduls: ['cables', 'boto'] },
+    { nom: 'Nivell 2', segons: 180, errors: 3, moduls: ['cables', 'boto'] },
+    { nom: 'Nivell 3', segons: 120, errors: 2, moduls: ['cables', 'boto'] },
+  ];
 
   const COLORS_CABLE = {
     vermell: '#d3261e', blau: '#1f5fd6', groc: '#f0bb12', verd: '#1c9a45', negre: '#17181a',
@@ -85,7 +92,7 @@
   }
 
   const api = {
-    VERSIO, PARTIDA, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
+    VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
     reglaCables, solucioCables, solucioBoto, generaBomba,
   };
