@@ -40,15 +40,16 @@ async function resolBoto(p, b) {
   if (R.solucioBoto(b) === 'clic') { await p.mouse.up(); return; }
   await p.waitForFunction(() => document.querySelector('#llum').dataset.color);
   const llum = await p.evaluate(() => document.querySelector('#llum').dataset.color);
-  // Deixa anar just quan el segon acaba de canviar, com faria algú atent.
-  let abans = await total(p);
+  // Amb el rellotge aturat es comprova la regla sense dependre de la velocitat de la màquina.
+  await p.evaluate(() => window.__atura());
   for (;;) {
-    const ara = await total(p);
-    if (ara !== abans && R.LLUMS[llum].test(ara % 60)) break;
-    abans = ara;
-    await p.waitForTimeout(30);
+    if (R.LLUMS[llum].test((await total(p)) % 60)) break;
+    const abans = await total(p);
+    await p.evaluate(() => window.__salta(1000));
+    await p.waitForFunction((t) => Number(document.querySelector('#temps').dataset.total) !== t, abans);
   }
   await p.mouse.up();
+  await p.evaluate(() => window.__segueix());
 }
 
 (async () => {
@@ -57,7 +58,7 @@ async function resolBoto(p, b) {
   const url = `${base}/index.html`;
   const urlManual = `${base}/manual/index.html`;
   const nav = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const ctx = await nav.newContext({ viewport: { width: 1366, height: 768 } });
+  const ctx = await nav.newContext({ viewport: CAPTURES ? { width: 1366, height: 768 } : { width: 960, height: 540 } });
   const p = await ctx.newPage();
   // A les proves no hi ha targeta gràfica: es dibuixa poc perquè el rellotge no vagi carregat,
   // i es pot saltar temps per comprovar el final de la partida.
@@ -65,9 +66,11 @@ async function resolBoto(p, b) {
     window.__ms = 2000;
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (f) => setTimeout(() => raf(f), window.__ms);
-    const ara = performance.now.bind(performance); let salt = 0;
-    performance.now = () => ara() + salt;
+    const ara = performance.now.bind(performance); let salt = 0; let fix = null;
+    performance.now = () => (fix !== null ? fix + salt : ara() + salt);
     window.__salta = (ms) => { salt += ms; };
+    window.__atura = () => { fix = ara(); };
+    window.__segueix = () => { salt += fix - ara(); fix = null; };
   });
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
@@ -92,7 +95,7 @@ async function resolBoto(p, b) {
     assert.strictEqual(await fet(p, 'cables'), true);
     if (R.solucioBoto(b) === 'clic') clics++; else manten++;
     await resolBoto(p, b);
-    await p.waitForFunction(() => document.body.dataset.fase === 'salvada', null, { timeout: 5000 }).catch(async (e) => {
+    await p.waitForFunction(() => document.body.dataset.fase === 'salvada', null, { timeout: 8000 }).catch(async (e) => {
       console.log('Estat:', JSON.stringify(b), R.solucioBoto(b), await p.evaluate(() => ({ err: document.querySelector('#errors').textContent, f: { ...document.querySelector('#fets').dataset }, t: document.querySelector('#temps').textContent, fase: document.body.dataset.fase, llum: document.querySelector('#llum').textContent, box: document.querySelector('#boto').getBoundingClientRect().toJSON() })));
       throw e;
     });
@@ -133,7 +136,7 @@ async function resolBoto(p, b) {
   await p.evaluate(() => { window.__ms = 0; });
   const altre = b.cables.findIndex((_, i) => i !== R.solucioCables(b) && i !== dolent);
   await p.locator(`.cable[data-i="${altre}"]`).click();
-  await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 3000 });
+  await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
   await p.waitForTimeout(350);
   await captura(p, 'petada-1');
   await p.waitForTimeout(1200);
@@ -156,7 +159,7 @@ async function resolBoto(p, b) {
   const vermell = await p.evaluate(() => Number(getComputedStyle(document.documentElement).getPropertyValue('--alarma')));
   assert(vermell > 0, 'alarma activa');
   await p.evaluate(() => { window.__ms = 2000; window.__salta(13000); });
-  await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 3000 });
+  await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
   assert((await p.textContent('#nota-text')).includes("S'ha acabat el temps"));
   console.log('A 0:00 la bomba peta.');
@@ -168,7 +171,7 @@ async function resolBoto(p, b) {
   b = await llegeix(p);
   const dolents = b.cables.map((_, i) => i).filter((i) => i !== R.solucioCables(b)).slice(0, lim);
   for (const i of dolents) await p.locator(`.cable[data-i="${i}"]`).click();
-  await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 3000 });
+  await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
   console.log(`El nivell 3 peta amb ${lim} errors.`);
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
 
