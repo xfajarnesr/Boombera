@@ -1,10 +1,12 @@
-# Curtcircuit
+# Boombera
+
+*Parla o peta.*
 
 Joc d'aula per parelles, en català. Qui desactiva veu la bomba a la pantalla, qui fa d'expert té el manual imprès, i només poden parlar.
 
 - **Joc:** https://xfajarnesr.github.io/Curtcircuit/
 - **Manual:** https://xfajarnesr.github.io/Curtcircuit/manual/
-- **Manual en PDF:** https://xfajarnesr.github.io/Curtcircuit/manual/Curtcircuit-manual.pdf
+- **Manual en PDF:** https://xfajarnesr.github.io/Curtcircuit/manual/Boombera-manual.pdf
 
 ## Com funciona el codi
 

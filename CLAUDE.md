@@ -1,4 +1,4 @@
-# Curtcircuit
+# Boombera
 
 Joc d'aula en català inspirat en la idea de desactivar una bomba parlant. Parla a Xavi en català i de manera directa.
 

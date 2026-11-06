@@ -319,6 +319,18 @@ const senseAnim = 150;
   assert.strictEqual(await fet(p, 'cables'), true);
   console.log('El teclat funciona per tallar.');
 
+  // Nom, lema i controls amb icones: altaveu i pantalla completa.
+  assert.strictEqual(await p.title(), 'Boombera');
+  assert.strictEqual(await p.locator('#so svg').count(), 1);
+  assert.strictEqual(await p.locator('#pantalla svg').count(), 1);
+  const etSo = await p.getAttribute('#so', 'aria-label');
+  await p.locator('#so').dispatchEvent('click');
+  await p.waitForFunction((e) => document.querySelector('#so').getAttribute('aria-label') !== e, etSo);
+  await p.locator('#so').dispatchEvent('click');
+  await p.waitForFunction((e) => document.querySelector('#so').getAttribute('aria-label') === e, etSo);
+  assert(!(await p.textContent('body')).includes('Curtcircuit'), 'el nom antic no surt al joc');
+  console.log("Boombera: l'altaveu canvia d'estat i hi ha el botó de pantalla completa.");
+
   // El joc no enllaça el manual.
   assert.strictEqual(await p.locator('a[href*="manual"]').count(), 0, 'el joc no ha d\'enllaçar el manual');
 
@@ -327,6 +339,7 @@ const senseAnim = 150;
   await p.goto(urlManual);
   await p.waitForTimeout(200);
   const text = await p.textContent('#vista-manual');
+  assert(text.includes('Boombera') && text.includes('Parla o peta') && !text.includes('Curtcircuit'), 'nom i lema al manual');
   for (const r of R.REGLES_CABLES) assert(text.includes(r.pregunta), r.pregunta);
   for (const r of R.REGLES_BOTO) assert(text.includes(r.condicio), r.condicio);
   for (const l of Object.values(R.LLUMS)) assert(text.includes(l.text), l.text);

@@ -15,7 +15,7 @@
       const art = document.createElement('article');
       art.className = 'full';
       art.innerHTML = `${moduls.map((m) => window.ManualModuls[m](R, esc)).join('')}
-        <footer class="peu-full"><span>Curtcircuit, regles <span data-versio></span></span><span>Full ${i + 2} de ${total}</span></footer>`;
+        <footer class="peu-full"><span>Boombera, regles <span data-versio></span></span><span>Full ${i + 2} de ${total}</span></footer>`;
       const h = art.querySelector('h2'); if (h) h.classList.add('primer-titol');
       $('#vista-manual').appendChild(art);
     });

@@ -8,7 +8,7 @@ const manual = path.join(__dirname, '..', 'site', 'manual');
   const p = await nav.newPage();
   await p.goto('file://' + path.join(manual, 'index.html'));
   await p.evaluate(() => document.fonts.ready);
-  await p.pdf({ path: path.join(manual, 'Curtcircuit-manual.pdf'), preferCSSPageSize: true, printBackground: true });
+  await p.pdf({ path: path.join(manual, 'Boombera-manual.pdf'), preferCSSPageSize: true, printBackground: true });
   await nav.close();
   console.log('PDF generat.');
 })().catch((e) => { console.error(e); process.exit(1); });

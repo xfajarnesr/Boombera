@@ -9,6 +9,7 @@ body { background: #3b3d3f; color-scheme: light; color: #000; font-family: var(-
 .full p { margin: 0 0 3mm; max-width: 68ch; }
 .cap-manual { border-bottom: 4pt solid #000; margin-bottom: 5mm; padding-bottom: 2mm; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .cap-manual h1 { font-family: var(--estargit); font-weight: 400; font-size: 42pt; line-height: 1; margin: 0; }
+.cap-manual .lema { font-family: var(--titols); font-weight: 700; font-size: 14pt; letter-spacing: .08em; text-transform: uppercase; margin: 1mm 0 0 !important; }
 .subtitol { font-family: var(--titols); font-weight: 700; font-size: 15pt; margin: 0 !important; }
 .entradeta { font-size: 15pt; line-height: 1.32; margin-bottom: 5mm !important; }
 .full h2 { font-family: var(--titols); font-size: 23pt; line-height: 1.05; margin: 5mm 0 1.5mm; }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Curtcircuit</title>
+<title>Boombera</title>
 <link rel="stylesheet" href="comu/comu.css">
 <link rel="stylesheet" href="joc.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
@@ -18,7 +18,7 @@
   <div id="dianes"></div>
 
   <div class="dades-ocultes">
-    <h1>Curtcircuit</h1>
+    <h1>Boombera</h1>
     <p>Número de sèrie: <span id="serie"></span></p>
     <p>Piles: <span id="piles"></span></p>
     <ul id="indicadors"></ul>
@@ -29,11 +29,15 @@
     <p id="estat" aria-live="assertive"></p>
   </div>
 
-  <button id="so" type="button">Apaga el so</button>
+  <div id="controls">
+    <button id="so" type="button" aria-pressed="true"></button>
+    <button id="pantalla" type="button"></button>
+  </div>
 
   <section id="nota" aria-labelledby="nota-titol">
-    <h2 id="nota-titol">Curtcircuit</h2>
+    <h2 id="nota-titol">Boombera</h2>
     <div id="nota-text">
+      <p class="lema">Parla o peta</p>
       <p>Seieu d'esquena. Qui desactiva veu aquesta pantalla, qui fa d'expert té el manual, i només podeu parlar.</p>
     </div>
     <div id="nivells"></div>

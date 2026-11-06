@@ -185,10 +185,38 @@ function pintaNivells() {
 }
 
 /* ---------- So ---------- */
+// Altaveu: amb ones si sona, ratllat si no.
+const ICONES = {
+  so: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  mut: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9l6 6M22 9l-6 6"/></svg>',
+  amplia: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>',
+  redueix: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg>',
+};
 const btSo = $('#so');
-const pintaSo = () => { btSo.textContent = so.actiu ? 'Apaga el so' : 'Encén el so'; };
+const pintaSo = () => {
+  btSo.innerHTML = so.actiu ? ICONES.so : ICONES.mut;
+  btSo.setAttribute('aria-label', so.actiu ? 'Apaga el so' : 'Encén el so');
+  btSo.title = btSo.getAttribute('aria-label');
+  btSo.setAttribute('aria-pressed', String(so.actiu));
+};
 btSo.addEventListener('click', () => { so.commuta(); pintaSo(); });
 pintaSo();
+
+/* ---------- Pantalla completa ---------- */
+const btPantalla = $('#pantalla');
+const enPantallaCompleta = () => Boolean(document.fullscreenElement);
+const pintaPantalla = () => {
+  btPantalla.innerHTML = enPantallaCompleta() ? ICONES.redueix : ICONES.amplia;
+  btPantalla.setAttribute('aria-label', enPantallaCompleta() ? 'Surt de la pantalla completa' : 'Pantalla completa');
+  btPantalla.title = btPantalla.getAttribute('aria-label');
+};
+if (!document.fullscreenEnabled) btPantalla.hidden = true;
+btPantalla.addEventListener('click', () => {
+  const p = enPantallaCompleta() ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  if (p && p.catch) p.catch(() => {});
+});
+document.addEventListener('fullscreenchange', pintaPantalla);
+pintaPantalla();
 
 /* ---------- Rellotge ---------- */
 setInterval(() => {
