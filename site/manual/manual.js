@@ -3,7 +3,7 @@
   const $ = (s) => document.querySelector(s);
   const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   // Quins mòduls van a cada full, a partir del full 2.
-  const FULLS = [['cables', 'boto'], ['sequencia', 'memoria'], ['contrasenya', 'simbols']];
+  const FULLS = [['cables', 'boto'], ['sequencia', 'memoria'], ['contrasenya', 'simbols'], ['laberint', 'morse']];
   const total = FULLS.length + 1;
 
   function pintaManual() {

@@ -85,9 +85,10 @@ const senseAnim = 150;
   await p.waitForTimeout(400);
   await captura(p, 'guanya');
   let q;
-  const SIS = R.NIVELLS.findIndex((n) => n.moduls.length === 6);
-  assert(SIS >= 0 && R.MODULS.every((m) => R.NIVELLS[SIS].moduls.includes(m)), 'hi ha d\'haver un nivell amb els sis mòduls');
-  console.log(`${2 * R.NIVELLS.length} partides guanyades sense errors, dues amb els sis mòduls.`);
+  const SIS = R.NIVELLS.findIndex((n) => n.moduls.length === 6 && ['contrasenya', 'simbols'].every((m) => n.moduls.includes(m)));
+  assert(SIS >= 0, "hi ha d'haver un nivell de sis mòduls amb contrasenya i símbols");
+  assert(R.MODULS.every((m) => R.NIVELLS.some((n) => n.moduls.includes(m))), 'tots els mòduls es juguen en algun nivell');
+  console.log(`${2 * R.NIVELLS.length} partides guanyades sense errors, amb els ${R.MODULS.length} mòduls.`);
 
   // Contrasenya: enviar una paraula equivocada és error i no mou les lletres, i la bona resol el mòdul.
   await nivell(p, SIS);
@@ -125,6 +126,58 @@ const senseAnim = 150;
   await proves.simbols.resol(p);
   assert.strictEqual(await fet(p, 'simbols'), true);
   console.log('Símbols: un error fa tornar a començar, i es pot acabar resolent.');
+  await p.evaluate(() => { window.__salta(600000); });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
+
+  // Senyal i laberint: un canal equivocat és error i no toca el visor; topar amb una paret és error i la llum no es mou.
+  const LM = R.NIVELLS.findIndex((n) => ['laberint', 'morse'].every((m) => n.moduls.includes(m)));
+  const Lab = proves.laberint;
+  const juga = async () => {
+    await p.waitForSelector('.nivell');
+    await p.click(`.nivell[data-nivell="${LM}"]`);
+    await p.waitForFunction(() => document.body.dataset.fase === 'joc' && document.querySelector('#laberint') && document.querySelector('#morse'));
+    return llegeix(p, R.NIVELLS[LM].moduls);
+  };
+  // Camina cap a la sortida fins a una casella amb alguna paret, i hi topa.
+  const topa = async (piles) => {
+    const v = await Lab.vista(p);
+    const { idx, sortida } = Lab.oracle(v.marques, piles);
+    const pas = Lab.passadissos(R.LABERINTS[idx].files);
+    const paretDe = (c) => Object.keys(R.DIRECCIONS).find((d) => { const w = Lab.salta(c, d); return !w || !pas.has(`${c}>${w}`); });
+    const cami = Lab.cami(R.LABERINTS[idx].files, v.pos, sortida);
+    let pos = v.pos;
+    for (let k = 0; !paretDe(pos); k++) {
+      assert(k < cami.length - 1, 'el camí no té cap paret abans de la sortida');
+      await Lab.mou(p, cami[k]); pos = Lab.salta(pos, cami[k]);
+    }
+    assert.strictEqual((await Lab.vista(p)).pos, pos);
+    await Lab.mou(p, paretDe(pos));
+    return pos;
+  };
+  q = await juga();
+  await captura(p, 'laberint-morse');
+  const paraulaMorse = proves.morse.desxifra(await proves.morse.observa(p));
+  const canalBo = proves.morse.oracle(paraulaMorse, q.numero, q.piles);
+  await proves.morse.posaCanal(p, (canalBo + 1) % 100);
+  await p.locator('.envia-canal').dispatchEvent('click');
+  assert.strictEqual(await fusibles(p), 1, 'un canal equivocat és error');
+  assert.strictEqual(await fet(p, 'morse'), false);
+  assert.strictEqual(await proves.morse.canal(p), (canalBo + 1) % 100, 'el visor es queda com estava');
+  await proves.morse.posaCanal(p, canalBo);
+  await p.locator('.envia-canal').dispatchEvent('click');
+  assert.strictEqual(await fet(p, 'morse'), true);
+  await topa(q.piles);
+  assert.strictEqual(await fusibles(p), 2);
+  await p.waitForFunction(() => document.body.dataset.fase === 'petada');
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  q = await juga();
+  const contra = await topa(q.piles);
+  assert.strictEqual(await fusibles(p), 1, 'topar amb una paret és error');
+  assert.strictEqual((await Lab.vista(p)).pos, contra, 'la llum es queda on era');
+  assert.strictEqual(await fet(p, 'laberint'), false);
+  await Lab.resol(p, R, q);
+  await p.waitForFunction(() => document.querySelector('#fets').dataset.laberint === 'true');
+  console.log('Senyal: un canal equivocat és error. Laberint: una paret és error i la llum no es mou. Tots dos es resolen.');
   await p.evaluate(() => { window.__salta(600000); });
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
 
@@ -267,7 +320,7 @@ const senseAnim = 150;
   // El joc no enllaça el manual.
   assert.strictEqual(await p.locator('a[href*="manual"]').count(), 0, 'el joc no ha d\'enllaçar el manual');
 
-  // El manual surt de les dades, no porta la llista de primers i cap en quatre pàgines A4.
+  // El manual surt de les dades, no porta la llista de primers i cap en cinc pàgines A4.
   await p.setViewportSize({ width: 1000, height: 1200 });
   await p.goto(urlManual);
   await p.waitForTimeout(200);
@@ -281,26 +334,32 @@ const senseAnim = 150;
   for (const f of R.REGLES_MEMORIA) for (const a of Object.values(f)) assert(text.includes(R.textMemoria(a)), R.textMemoria(a));
   for (const w of R.CONTRASENYA.paraules) assert(text.includes(w), w);
   for (const s of R.SIMBOLS) assert(text.includes(String(s.valor)), s.id);
+  for (const w of R.MORSE.paraules) assert(text.includes(w.paraula) && text.includes(String(w.canal)), w.paraula);
+  assert.strictEqual(await p.locator('.morse-alfabet > div').count(), 26);
+  assert.strictEqual(await p.locator('svg.laberint').count(), R.LABERINTS.length);
+  assert.strictEqual(await p.locator('svg.laberint .marca').count(), 2 * R.LABERINTS.length);
+  assert.strictEqual(await p.locator('svg.laberint .sortida').count(), 4 * R.LABERINTS.length);
   assert.strictEqual(await p.locator('.simbol .nom-simbol').count(), 0, 'el manual no posa nom als símbols');
   assert.strictEqual(await p.locator('.simbol svg path').count(), R.SIMBOLS.length);
   assert(!/2, 3, 5(,| i) 7/.test(text), 'el manual no ha de portar la llista de primers');
   assert(text.includes(`v${R.VERSIO}`) && !text.includes('v1'), 'la versió ha de sortir de les regles');
-  assert.strictEqual(await p.locator('.full').count(), 4);
-  for (const k of [0, 1, 2, 3]) {
+  const FULLS = 5;
+  assert.strictEqual(await p.locator('.full').count(), FULLS);
+  for (let k = 0; k < FULLS; k++) {
     const sobra = await p.locator('.full').nth(k).evaluate((f) => { const peu = f.querySelector('.peu-full').getBoundingClientRect(); const ant = f.querySelector('.peu-full').previousElementSibling.getBoundingClientRect(); return peu.top - ant.bottom; });
     assert(sobra >= -1, `full ${k + 1}: el contingut xoca amb el peu`);
   }
   const pdf = await p.pdf({ preferCSSPageSize: true, printBackground: true });
   const { PDFDocument } = require('pdf-lib');
   const doc = await PDFDocument.load(pdf);
-  assert.strictEqual(doc.getPageCount(), 4, 'el manual ha de tenir 4 pàgines');
+  assert.strictEqual(doc.getPageCount(), FULLS, `el manual ha de tenir ${FULLS} pàgines`);
   await p.emulateMedia({ media: 'print' });
-  for (const k of [0, 1, 2, 3]) {
+  for (let k = 0; k < FULLS; k++) {
     const fora = await p.locator('.full').nth(k).evaluate((f) => f.scrollHeight - f.clientHeight);
     assert(fora <= 1, `full ${k + 1} es talla en imprimir: ${fora}px`);
   }
   await p.emulateMedia({ media: 'screen' });
-  console.log('El manual té 4 pàgines A4.');
+  console.log(`El manual té ${FULLS} pàgines A4.`);
 
   assert.deepStrictEqual(errs, [], 'errors de consola: ' + errs.join('; '));
   await nav.close();

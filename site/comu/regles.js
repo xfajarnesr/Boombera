@@ -1,6 +1,6 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 4;
+  const VERSIO = 5;
 
   const PARTIDA = { penalitzacio: 30, mantenirMs: 500 };
 
@@ -11,6 +11,7 @@
     { nom: 'Nivell 2', segons: 240, errors: 3, moduls: ['cables', 'boto', 'sequencia'] },
     { nom: 'Nivell 3', segons: 300, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria'] },
     { nom: 'Nivell 4', segons: 420, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'] },
+    { nom: 'Nivell 5', segons: 480, errors: 2, moduls: ['cables', 'boto', 'memoria', 'simbols', 'laberint', 'morse'] },
   ];
 
   const COLORS_CABLE = {
@@ -192,6 +193,66 @@
     return plaques.map((_, i) => i).sort((x, y) => signe * (simbol(plaques[x]).valor - simbol(plaques[y]).valor));
   };
 
+
+  /* ---------- Laberint ---------- */
+  // Columnes de la A a la F i files de l'1 (a baix) al 6 (a dalt), com en un pla.
+  // Cada fila es llegeix de la A a la F. Cada xifra diu cap a on està obert: 1 a la dreta, 2 cap avall, 3 tots dos.
+  const LABERINT = { costat: 6, columnes: 'ABCDEF' };
+  const LABERINTS = [
+    { files: ['311232', '231022', '213022', '210222', '232102', '101110'], marques: ['A2', 'E5'], sortides: ['D5', 'A4', 'A1', 'F2'] },
+    { files: ['303112', '110322', '311012', '312122', '222230', '101010'], marques: ['A2', 'C6'], sortides: ['E3', 'A3', 'F5', 'A5'] },
+    { files: ['312322', '221010', '212312', '123032', '300302', '111010'], marques: ['D1', 'E5'], sortides: ['E2', 'F5', 'A3', 'C5'] },
+    { files: ['321230', '232232', '222202', '220112', '211110', '111110'], marques: ['D1', 'B4'], sortides: ['B3', 'C5', 'F6', 'F1'] },
+    { files: ['311322', '122210', '212110', '301122', '231102', '111110'], marques: ['F3', 'C6'], sortides: ['F5', 'C1', 'A4', 'E3'] },
+    { files: ['331122', '211212', '212210', '112112', '310320', '111010'], marques: ['F3', 'B4'], sortides: ['E6', 'D3', 'B1', 'A4'] },
+  ];
+  const DIRECCIONS = { amunt: [0, 1], avall: [0, -1], dreta: [1, 0], esquerra: [-1, 0] };
+  const casella = (nom) => [LABERINT.columnes.indexOf(nom[0]), Number(nom.slice(1)) - 1];
+  const nomCasella = ([x, y]) => `${LABERINT.columnes[x]}${y + 1}`;
+  const xifra = (L, x, y) => Number(L.files[LABERINT.costat - 1 - y][x]);
+  // Es pot passar de [x, y] a la casella del costat en aquesta direcció?
+  const obert = (L, [x, y], dir) => {
+    const [dx, dy] = DIRECCIONS[dir]; const n = LABERINT.costat;
+    const nx = x + dx; const ny = y + dy;
+    if (nx < 0 || ny < 0 || nx >= n || ny >= n) return false;
+    if (dx === 1) return (xifra(L, x, y) & 1) > 0;
+    if (dx === -1) return (xifra(L, nx, ny) & 1) > 0;
+    if (dy === -1) return (xifra(L, x, y) & 2) > 0;
+    return (xifra(L, nx, ny) & 2) > 0;
+  };
+  const mouLaberint = (L, c, dir) => (obert(L, c, dir) ? [c[0] + DIRECCIONS[dir][0], c[1] + DIRECCIONS[dir][1]] : null);
+  // El laberint es reconeix per les dues marques juntes: cada marca sola surt a dos laberints.
+  const identificaLaberint = (marques) => LABERINTS.findIndex((L) => [...L.marques].sort().join() === [...marques].sort().join());
+  const sortidaLaberint = (b) => casella(LABERINTS[b.laberint.idx].sortides[b.piles - 1]);
+  const distancies = (L, origen) => {
+    const d = new Map([[String(origen), 0]]); const cua = [origen];
+    while (cua.length) {
+      const c = cua.shift();
+      for (const dir of Object.keys(DIRECCIONS)) {
+        const v = mouLaberint(L, c, dir);
+        if (v && !d.has(String(v))) { d.set(String(v), d.get(String(c)) + 1); cua.push(v); }
+      }
+    }
+    return d;
+  };
+
+  /* ---------- Morse ---------- */
+  const MORSE = {
+    unitatMs: 300, punt: 1, ratlla: 3, entreSenyals: 1, entreLletres: 3, entreRepeticions: 8,
+    codi: {
+      A: '.-', B: '-...', C: '-.-.', D: '-..', E: '.', F: '..-.', G: '--.', H: '....', I: '..', J: '.---', K: '-.-', L: '.-..', M: '--',
+      N: '-.', O: '---', P: '.--.', Q: '--.-', R: '.-.', S: '...', T: '-', U: '..-', V: '...-', W: '.--', X: '-..-', Y: '-.--', Z: '--..',
+    },
+    paraules: [
+      { paraula: 'TEMPS', canal: 12 }, { paraula: 'VOLTS', canal: 17 }, { paraula: 'RADAR', canal: 23 }, { paraula: 'PILOT', canal: 28 },
+      { paraula: 'METRE', canal: 31 }, { paraula: 'SEGON', canal: 36 }, { paraula: 'MINUT', canal: 42 }, { paraula: 'FLAIX', canal: 47 },
+      { paraula: 'ESPIA', canal: 53 }, { paraula: 'CODIS', canal: 58 }, { paraula: 'SERRA', canal: 64 }, { paraula: 'TIGRE', canal: 69 },
+    ],
+  };
+  const canalDe = (paraula) => MORSE.paraules.find((p) => p.paraula === paraula).canal;
+  // Sèrie parella: se sumen les piles. Sèrie senar: es resten.
+  const canalMorse = (b) => canalDe(b.morse.paraula) + (b.numero % 2 === 0 ? b.piles : -b.piles);
+
   const tria = (llista, rng) => llista[Math.floor(rng() * llista.length)];
   const senseMesDeDos = (c) => c.every((x) => c.filter((y) => y === x).length <= 2);
 
@@ -239,6 +300,21 @@
   }
   const generaSimbols = (rng) => ({ plaques: barreja(SIMBOLS.map((s) => s.id), rng).slice(0, PLAQUES) });
 
+
+  function generaLaberint(rng, piles) {
+    const idx = Math.floor(rng() * LABERINTS.length);
+    const L = LABERINTS[idx];
+    const sortida = casella(L.sortides[piles - 1]);
+    const d = distancies(L, sortida);
+    const ocupades = new Set([...L.marques, ...L.sortides]);
+    const bones = [];
+    for (let x = 0; x < LABERINT.costat; x++) for (let y = 0; y < LABERINT.costat; y++) {
+      if (!ocupades.has(nomCasella([x, y])) && d.get(String([x, y])) >= 5) bones.push([x, y]);
+    }
+    return { idx, inici: tria(bones, rng) };
+  }
+  const generaMorse = (rng) => ({ paraula: tria(MORSE.paraules, rng).paraula });
+
   function generaBomba(rng = Math.random) {
     const noms = Object.keys(COLORS_CABLE);
     const n = 3 + Math.floor(rng() * 3);
@@ -247,15 +323,18 @@
     const lletres = Array.from({ length: 3 }, () => tria(LLETRES.split(''), rng)).join('');
     const numero = 10 + Math.floor(rng() * 90);
     const etiquetes = [...ETIQUETES].sort(() => rng() - 0.5).slice(0, 2);
+    const piles = 1 + Math.floor(rng() * 4);
     return {
       lletres, numero, cables,
-      piles: 1 + Math.floor(rng() * 4),
+      piles,
       indicadors: etiquetes.map((etiqueta) => ({ etiqueta, ences: rng() < 0.5 })),
       boto: { color: tria(Object.keys(COLORS_BOTO), rng), paraula: tria(PARAULES, rng) },
       sequencia: generaSequencia(rng),
       memoria: generaMemoria(rng),
       contrasenya: generaContrasenya(rng),
       simbols: generaSimbols(rng),
+      laberint: generaLaberint(rng, piles),
+      morse: generaMorse(rng),
     };
   }
 
@@ -263,11 +342,13 @@
     VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
     reglaCables, solucioCables, solucioBoto, generaBomba,
-    MODULS: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'],
+    MODULS: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse'],
     SEQUENCIA, saltsSequencia, sentitSequencia, respostaSequencia,
     MEMORIA, CATEGORIES_MEMORIA, REGLES_MEMORIA, categoriaMemoria, textMemoria, solucioMemoria,
     CONTRASENYA, paraulesDeRodets, triaContrasenya, solucioContrasenya,
     SIMBOLS, GRUIX_SIMBOL, PLAQUES, simbol, sumaSimbols, sentitSimbols, solucioSimbols,
+    LABERINT, LABERINTS, DIRECCIONS, casella, nomCasella, obert, mouLaberint, identificaLaberint, sortidaLaberint, distancies,
+    MORSE, canalDe, canalMorse,
   };
   if (typeof module !== 'undefined') module.exports = api;
   else arrel.Curtcircuit = api;
