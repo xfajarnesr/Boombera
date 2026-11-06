@@ -30,7 +30,9 @@ const total = (p) => p.evaluate(() => Number(document.querySelector('#temps').da
 const fusibles = (p) => p.evaluate(() => Number(document.querySelector('#errors').dataset.n));
 const fet = (p, m) => p.evaluate((x) => document.querySelector('#fets').dataset[x] === 'true', m);
 const captura = async (p, nom) => { if (CAPTURES) await p.screenshot({ path: path.join(CAPTURES, nom + '.png') }); };
-const nivell = async (p, n) => { await p.waitForSelector('.nivell'); await p.click(`.nivell[data-nivell="${n}"]`); await p.waitForTimeout(senseAnim); };
+// Espera dos fotogrames de veritat: després d'una explosió, el navegador lent encara pot anar endarrerit i no atendre el clic.
+const fotogrames = (p) => p.evaluate(() => new Promise((ok) => window.__raf(() => window.__raf(ok))));
+const nivell = async (p, n) => { await p.waitForSelector('.nivell'); await fotogrames(p); await p.click(`.nivell[data-nivell="${n}"]`); await p.waitForTimeout(senseAnim); };
 const senseAnim = 150;
 
 (async () => {
@@ -46,6 +48,7 @@ const senseAnim = 150;
   await ctx.addInitScript(() => {
     window.__ms = 2000;
     const raf = window.requestAnimationFrame.bind(window);
+    window.__raf = raf;
     window.requestAnimationFrame = (f) => setTimeout(() => raf(f), window.__ms);
     const ara = performance.now.bind(performance); let salt = 0; let fix = null;
     performance.now = () => (fix !== null ? fix + salt : ara() + salt);
@@ -133,8 +136,7 @@ const senseAnim = 150;
   const LM = R.NIVELLS.findIndex((n) => ['laberint', 'morse'].every((m) => n.moduls.includes(m)));
   const Lab = proves.laberint;
   const juga = async () => {
-    await p.waitForSelector('.nivell');
-    await p.click(`.nivell[data-nivell="${LM}"]`);
+    await nivell(p, LM);
     await p.waitForFunction(() => document.body.dataset.fase === 'joc' && document.querySelector('#laberint') && document.querySelector('#morse'));
     return llegeix(p, R.NIVELLS[LM].moduls);
   };
