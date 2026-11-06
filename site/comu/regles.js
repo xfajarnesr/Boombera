@@ -1,14 +1,15 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 2;
+  const VERSIO = 3;
 
   const PARTIDA = { penalitzacio: 30, mantenirMs: 500 };
 
   // Cada nivell diu quins mòduls porta la bomba, de quant temps disposa i quants errors la fan petar.
   const NIVELLS = [
-    { nom: 'Nivell 1', segons: 240, errors: 3, moduls: ['cables', 'boto'] },
-    { nom: 'Nivell 2', segons: 180, errors: 3, moduls: ['cables', 'boto'] },
-    { nom: 'Nivell 3', segons: 120, errors: 2, moduls: ['cables', 'boto'] },
+    // Provisionals: més mòduls i més temps. La llista definitiva es decidirà més endavant.
+    { nom: 'Nivell 1', segons: 180, errors: 3, moduls: ['cables', 'boto'] },
+    { nom: 'Nivell 2', segons: 240, errors: 3, moduls: ['cables', 'boto', 'sequencia'] },
+    { nom: 'Nivell 3', segons: 300, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria'] },
   ];
 
   const COLORS_CABLE = {
@@ -72,8 +73,86 @@
     return r.test(b) ? r.si : r.no;
   };
 
+  /* ---------- Seqüència ---------- */
+  const SEQUENCIA = {
+    // L'anell es llegeix en sentit horari. Cada ronda repeteix els flaixos de l'anterior i n'hi afegeix.
+    anell: ['vermell', 'groc', 'blau', 'verd'],
+    rondes: [2, 3, 4],
+    flaixMs: 650, pausaMs: 250, descansMs: 1500, entreRondesMs: 800, reprenMs: 5000,
+  };
+  const saltsSequencia = (b, errors) => b.piles + errors;
+  const sentitSequencia = (b) => (b.numero % 2 === 0 ? 'horari' : 'antihorari');
+  const respostaSequencia = (b, flaix, errors) => {
+    const { anell } = SEQUENCIA; const n = anell.length;
+    const pas = sentitSequencia(b) === 'horari' ? 1 : -1;
+    const i = anell.indexOf(flaix) + pas * saltsSequencia(b, errors);
+    return anell[((i % n) + n) % n];
+  };
+
+  /* ---------- Memòria ---------- */
+  const MEMORIA = { etapes: 4, tecles: 4 };
+  const CATEGORIES_MEMORIA = {
+    quadrat: 'Quadrat perfecte (1, 4, 9)',
+    primer: 'Nombre primer',
+    cap: 'Cap dels dos',
+  };
+  const categoriaMemoria = (d) => (QUADRATS.includes(d) ? 'quadrat' : esPrimer(d) ? 'primer' : 'cap');
+  const REGLES_MEMORIA = [
+    { quadrat: { fes: 'gran' }, primer: { fes: 'petita' }, cap: { fes: 'posicio', n: 2 } },
+    { quadrat: { fes: 'valorDe', etapa: 1 }, primer: { fes: 'posicioDe', etapa: 1 }, cap: { fes: 'petita' } },
+    { quadrat: { fes: 'posicioDe', etapa: 2 }, primer: { fes: 'valorDe', etapa: 1 }, cap: { fes: 'gran' } },
+    { quadrat: { fes: 'valorDe', etapa: 2 }, primer: { fes: 'posicioDe', etapa: 3 }, cap: { fes: 'suma' } },
+  ];
+  const textMemoria = (a) => ({
+    gran: () => 'la tecla més gran',
+    petita: () => 'la més petita',
+    posicio: () => `la de la posició ${a.n}`,
+    valorDe: () => `el mateix valor que a l'etapa ${a.etapa}`,
+    posicioDe: () => `la mateixa posició que a l'etapa ${a.etapa}`,
+    suma: () => 'suma els tres valors premuts: si és parell, la més gran; si és senar, la més petita',
+  }[a.fes]());
+  // Retorna la posició (de 0 a 3) de l'única tecla correcta. `premudes` és [{ valor, posicio }, ...].
+  const solucioMemoria = (b, etapa, premudes) => {
+    const { pantalla, ordre } = b.memoria.etapes[etapa];
+    const a = REGLES_MEMORIA[etapa][categoriaMemoria(pantalla)];
+    const gran = () => ordre.indexOf(Math.max(...ordre));
+    const petita = () => ordre.indexOf(Math.min(...ordre));
+    switch (a.fes) {
+      case 'gran': return gran();
+      case 'petita': return petita();
+      case 'posicio': return a.n - 1;
+      case 'valorDe': return ordre.indexOf(premudes[a.etapa - 1].valor);
+      case 'posicioDe': return premudes[a.etapa - 1].posicio;
+      default: return premudes.reduce((s, p) => s + p.valor, 0) % 2 === 0 ? gran() : petita();
+    }
+  };
+
   const tria = (llista, rng) => llista[Math.floor(rng() * llista.length)];
   const senseMesDeDos = (c) => c.every((x) => c.filter((y) => y === x).length <= 2);
+
+  const barreja = (llista, rng) => {
+    const a = [...llista];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  function generaSequencia(rng) {
+    const llarg = SEQUENCIA.rondes[SEQUENCIA.rondes.length - 1];
+    return {
+      flaixos: Array.from({ length: llarg }, () => tria(SEQUENCIA.anell, rng)),
+      tecles: barreja(SEQUENCIA.anell, rng),
+    };
+  }
+  function generaMemoria(rng) {
+    const valors = barreja([1, 2, 3, 4, 5, 6, 7, 8, 9], rng).slice(0, MEMORIA.tecles);
+    const etapes = [];
+    for (let e = 0; e < MEMORIA.etapes; e++) {
+      let ordre;
+      // Les tecles sempre canvien de lloc, perquè valor i posició no siguin el mateix.
+      do { ordre = barreja(valors, rng); } while (e && ordre.join() === etapes[e - 1].ordre.join());
+      etapes.push({ pantalla: 1 + Math.floor(rng() * 9), ordre });
+    }
+    return { etapes };
+  }
 
   function generaBomba(rng = Math.random) {
     const noms = Object.keys(COLORS_CABLE);
@@ -88,6 +167,8 @@
       piles: 1 + Math.floor(rng() * 4),
       indicadors: etiquetes.map((etiqueta) => ({ etiqueta, ences: rng() < 0.5 })),
       boto: { color: tria(Object.keys(COLORS_BOTO), rng), paraula: tria(PARAULES, rng) },
+      sequencia: generaSequencia(rng),
+      memoria: generaMemoria(rng),
     };
   }
 
@@ -95,6 +176,9 @@
     VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
     reglaCables, solucioCables, solucioBoto, generaBomba,
+    MODULS: ['cables', 'boto', 'sequencia', 'memoria'],
+    SEQUENCIA, saltsSequencia, sentitSequencia, respostaSequencia,
+    MEMORIA, CATEGORIES_MEMORIA, REGLES_MEMORIA, categoriaMemoria, textMemoria, solucioMemoria,
   };
   if (typeof module !== 'undefined') module.exports = api;
   else arrel.Curtcircuit = api;

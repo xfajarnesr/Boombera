@@ -1,7 +1,8 @@
 // Escena 3D: carcassa blindada, llums, alarmes i explosió. No sap res de les regles.
 import * as THREE from 'three';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import { MODULS_3D, espaiBuit, etiqueta, ple, materials } from './moduls.js';
+import { espaiBuit, etiqueta, ple, materials } from './peces.js';
+import { MODULS } from '../moduls/registre.js';
 
 const AMPLE = 12.8; const ALT = 8.7;
 export const ESPAIS = [
@@ -92,7 +93,7 @@ export function creaEscena(canvas, senseMoviment) {
     const moduls = {};
     ESPAIS.forEach(([x, y], n) => {
       const nom = espais[n];
-      const g = nom ? MODULS_3D[nom](bomba) : espaiBuit();
+      const g = nom ? MODULS[nom].crea3D(bomba) : espaiBuit();
       g.position.set(x, y, 0.03);
       arrel.add(g); peces.push(g);
       if (nom) moduls[nom] = g;

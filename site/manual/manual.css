@@ -4,35 +4,43 @@ body { background: #3b3d3f; color-scheme: light; color: #000; font-family: var(-
 .eines a { background: #fff; color: #000; font-weight: 700; padding: 8px 16px; border-radius: 3px; }
 #vista-manual { padding: 20px 12px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
 .full {
-  width: 100%; max-width: 210mm; min-height: 297mm; background: #fff; color: #000; padding: 17mm 18mm 14mm; font-size: 12.5pt; line-height: 1.42; display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 6px 18px #0006;
+  width: 100%; max-width: 210mm; min-height: 297mm; background: #fff; color: #000; padding: 14mm 17mm 10mm; font-size: 11.5pt; line-height: 1.36; display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 6px 18px #0006;
 }
 .full p { margin: 0 0 3mm; max-width: 68ch; }
 .cap-manual { border-bottom: 4pt solid #000; margin-bottom: 5mm; padding-bottom: 2mm; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .cap-manual h1 { font-family: var(--estargit); font-weight: 400; font-size: 42pt; line-height: 1; margin: 0; }
 .subtitol { font-family: var(--titols); font-weight: 700; font-size: 15pt; margin: 0 !important; }
 .entradeta { font-size: 15pt; line-height: 1.32; margin-bottom: 5mm !important; }
-.full h2 { font-family: var(--titols); font-size: 25pt; line-height: 1.05; margin: 6mm 0 2mm; }
+.full h2 { font-family: var(--titols); font-size: 23pt; line-height: 1.05; margin: 5mm 0 1.5mm; }
 .full h2.primer-titol { margin-top: 0; }
 .full h3 { font-family: var(--titols); font-size: 17pt; margin: 4mm 0 1.5mm; }
-.to { font-style: italic; font-size: 12.5pt; margin-bottom: 2mm !important; }
+.to { font-style: italic; font-size: 11.5pt; margin-bottom: 2mm !important; }
 .apunts { display: grid; grid-template-columns: 1.1fr .6fr 1.3fr; gap: 4mm; border: 2pt solid #000; padding: 3mm 4mm 4mm; margin: 2mm 0 5mm; }
 .apunts div { display: flex; flex-direction: column; gap: 7mm; font-size: 10.5pt; font-weight: 700; justify-content: space-between; }
 .apunts i { display: block; border-bottom: 1.2pt solid #000; }
 .definicions { display: grid; grid-template-columns: 34mm 1fr; gap: 2.2mm 4mm; margin: 0; }
 .definicions dt { font-weight: 700; }
 .definicions dd { margin: 0; }
-.full table { width: 100%; border-collapse: collapse; margin: 1mm 0 3mm; font-size: 11.5pt; line-height: 1.28; }
+.full table { width: 100%; border-collapse: collapse; margin: 1mm 0 3mm; font-size: 10.5pt; line-height: 1.25; }
 .full th, .full td { border: 1.2pt solid #000; padding: 1.9mm 2.4mm; text-align: left; vertical-align: top; }
 .full thead th { background: #000; color: #fff; font-weight: 700; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 .full tbody th { font-weight: 700; white-space: nowrap; }
 .full .paraula { font-family: var(--titols); font-size: 15pt; }
 .llums th { width: 32mm; }
 .nivells { width: 70%; }
+.amb-anell { display: grid; grid-template-columns: 1fr 50mm; gap: 5mm; align-items: center; }
+.anell { width: 100%; font-family: var(--titols); font-weight: 700; font-size: 15px; }
+.anell .centre { font-size: 10px; font-weight: 400; font-family: var(--text); }
+.apunts-seq { grid-template-columns: 1.3fr 1fr; margin: 1mm 0 3mm; }
+.memoria td { font-size: 10pt; }
+.registre { width: 80%; }
+.registre td { height: 8mm; width: 15%; }
 .peu-full { margin-top: auto; padding-top: 4mm; display: flex; justify-content: space-between; font-size: 9.5pt; border-top: 1pt solid #000; }
 
 @media screen and (max-width: 800px) {
   .full { padding: 8mm 6mm; min-height: 0; font-size: 11.5pt; }
-  .apunts, .definicions { grid-template-columns: 1fr; }
+  .apunts, .definicions, .amb-anell { grid-template-columns: 1fr; }
+  .anell { max-width: 60mm; }
 }
 
 @page { size: A4; margin: 0; }

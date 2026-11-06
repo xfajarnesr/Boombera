@@ -1,13 +1,14 @@
 // Lògica de la partida: enllaça les regles, l'escena 3D i el so.
 import { creaEscena } from './motor/escena.js';
 import { creaSo } from './motor/so.js';
+import { MODULS } from './moduls/registre.js';
 
 const R = window.Curtcircuit;
 const $ = (s) => document.querySelector(s);
 const senseMoviment = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const so = creaSo();
 
-const S = { fase: 'inici', nivell: R.NIVELLS[1], b: null, finalMs: 0, errors: 0, cables: false, boto: false, tallats: new Set(), prem: null, ultim: null, quiet: 0 };
+const S = { fase: 'inici', nivell: R.NIVELLS[0], b: null, finalMs: 0, errors: 0, fets: new Set(), controls: [], ultim: null, quiet: 0 };
 const restantMs = () => (S.fase === 'joc' ? S.finalMs - performance.now() : S.quiet);
 const totalSegons = () => Math.max(0, Math.ceil(restantMs() / 1000));
 const format = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -22,7 +23,7 @@ async function arrenca() {
     $('#nota').hidden = true;
     return;
   }
-  novaBomba(R.NIVELLS[1]);
+  novaBomba(R.NIVELLS[R.NIVELLS.length - 1]);
   pintaNivells();
 }
 
@@ -33,50 +34,40 @@ function barreja(llista) {
 }
 
 function novaBomba(nivell) {
+  aturaModuls();
   S.nivell = nivell;
   S.b = R.generaBomba();
-  Object.assign(S, { errors: 0, cables: false, boto: false, tallats: new Set(), prem: null, ultim: null, quiet: nivell.segons * 1000 });
+  Object.assign(S, { errors: 0, fets: new Set(), controls: [], ultim: null, quiet: nivell.segons * 1000 });
   const espais = barreja([...nivell.moduls, ...Array(6 - nivell.moduls.length).fill(null)]);
   esc.construeix(S.b, espais, R.VERSIO);
   $('#dianes').innerHTML = '';
-  creaDianes();
+  $('#dades-moduls').innerHTML = '';
+  S.controls = nivell.moduls.map((nom) => MODULS[nom].creaJoc(contextDe(nom)));
   pintaDades();
   esc.posaTemps(format(totalSegons()), false);
   esc.posaErrors(0);
   esc.intensitat(0);
 }
+const aturaModuls = () => S.controls.forEach((c) => c.atura && c.atura());
 
-/* ---------- Controls transparents sobre el 3D, per ratolí i teclat ---------- */
-function creaDianes() {
-  const cont = $('#dianes');
-  const mc = esc.moduls.cables; const mb = esc.moduls.boto;
-  mc.userData.cables.forEach((c, i) => {
-    const el = document.createElement('button');
-    el.type = 'button'; el.className = 'diana cable';
-    el.dataset.i = i; el.dataset.color = S.b.cables[i];
-    el.setAttribute('aria-label', `Cable ${i + 1}, ${S.b.cables[i]}`);
-    el.addEventListener('pointerenter', () => mc.userData.realca(i, true));
-    el.addEventListener('pointerleave', () => mc.userData.realca(i, false));
-    el.addEventListener('focus', () => mc.userData.realca(i, true));
-    el.addEventListener('blur', () => mc.userData.realca(i, false));
-    el.addEventListener('click', () => tallaCable(i));
-    cont.appendChild(el);
-    esc.diana(el, mc, c.x, c.y, c.w, c.h);
-  });
-  const { boto } = mb.userData;
-  const bt = document.createElement('button');
-  bt.type = 'button'; bt.id = 'boto'; bt.className = 'diana rodona';
-  bt.dataset.color = S.b.boto.color; bt.textContent = S.b.boto.paraula;
-  bt.setAttribute('aria-label', `Botó ${S.b.boto.color} que diu ${S.b.boto.paraula}`);
-  bt.addEventListener('pointerdown', (e) => { e.preventDefault(); try { bt.setPointerCapture(e.pointerId); } catch (x) { /* sense captura */ } premBoto(); });
-  bt.addEventListener('pointerup', () => deixaBoto(false));
-  bt.addEventListener('pointercancel', () => deixaBoto(true));
-  bt.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); premBoto(); } });
-  bt.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); deixaBoto(false); } });
-  bt.addEventListener('blur', () => deixaBoto(true));
-  bt.addEventListener('contextmenu', (e) => e.preventDefault());
-  cont.appendChild(bt);
-  esc.diana(bt, mb, boto.x, boto.y, boto.w, boto.h);
+/* ---------- El que cada mòdul pot demanar a la partida ---------- */
+function contextDe(nom) {
+  const grup = esc.moduls[nom];
+  return {
+    b: S.b, grup, so,
+    actiu: () => S.fase === 'joc' && !S.fets.has(nom),
+    errors: () => S.errors,
+    segons: totalSegons,
+    error,
+    resolt: () => modulFet(nom),
+    diana(el, x, y, w, h) { $('#dianes').appendChild(el); esc.diana(el, grup, x, y, w, h); },
+    dada(id, text) {
+      const p = document.createElement('p');
+      p.id = id; p.textContent = text; p.setAttribute('aria-live', 'polite');
+      $('#dades-moduls').appendChild(p);
+      return p;
+    },
+  };
 }
 
 /* ---------- Dades per a lectors de pantalla ---------- */
@@ -87,7 +78,6 @@ function pintaDades() {
   $('#indicadors').innerHTML = b.indicadors.map((i) => `<li class="indicador" data-ences="${i.ences}">${i.etiqueta}: ${i.ences ? 'encès' : 'apagat'}</li>`).join('');
   pintaErrors(); pintaTemps(); pintaFets();
   $('#estat').textContent = 'Partida a punt';
-  $('#llum').removeAttribute('data-color');
 }
 function pintaErrors() {
   $('#errors').textContent = `${S.errors} de ${S.nivell.errors}`;
@@ -99,7 +89,8 @@ function pintaTemps() {
   $('#temps').dataset.total = t;
 }
 function pintaFets() {
-  $('#fets').dataset.cables = S.cables; $('#fets').dataset.boto = S.boto;
+  const f = $('#fets');
+  S.nivell.moduls.forEach((nom) => { f.dataset[nom] = S.fets.has(nom); });
 }
 
 /* ---------- Partida ---------- */
@@ -112,6 +103,7 @@ function comenca(nivell) {
   $('#esquerdes').innerHTML = '';
   esc.posaEstat('joc');
   so.arrenca();
+  S.controls.forEach((c) => c.arrenca && c.arrenca());
 }
 function error() {
   S.errors += 1; S.finalMs -= R.PARTIDA.penalitzacio * 1000;
@@ -123,48 +115,11 @@ function error() {
   else if (restantMs() <= 0) acaba(false, 'Els errors us han deixat sense temps.');
 }
 function modulFet(nom) {
+  S.fets.add(nom);
   so.modul();
   esc.moduls[nom].userData.marcaFet();
   pintaFets();
-  if (S.cables && S.boto) acaba(true);
-}
-function tallaCable(i) {
-  if (S.fase !== 'joc' || S.cables || S.tallats.has(i)) return;
-  S.tallats.add(i);
-  so.tall();
-  esc.moduls.cables.userData.talla(i);
-  const el = document.querySelector(`.cable[data-i="${i}"]`);
-  el.setAttribute('aria-label', `Cable ${i + 1}, ${S.b.cables[i]}, tallat`);
-  el.disabled = true;
-  esc.moduls.cables.userData.realca(i, false);
-  if (i === R.solucioCables(S.b)) { S.cables = true; modulFet('cables'); } else error();
-}
-function premBoto() {
-  if (S.fase !== 'joc' || S.boto || S.prem) return;
-  const prem = { viva: false, color: null };
-  S.prem = prem;
-  const m = esc.moduls.boto;
-  m.userData.prem(true);
-  prem.t = setTimeout(() => {
-    const c = Object.keys(R.LLUMS); prem.color = c[Math.floor(Math.random() * c.length)]; prem.viva = true;
-    const l = R.LLUMS[prem.color];
-    m.userData.llum(l.hex, `llum ${l.nom}`);
-    $('#llum').dataset.color = prem.color; $('#llum').textContent = `Llum ${l.nom}`;
-  }, R.PARTIDA.mantenirMs);
-}
-function apagaLlum() {
-  esc.moduls.boto.userData.llum(null, 'llum apagada');
-  $('#llum').removeAttribute('data-color'); $('#llum').textContent = 'Llum apagada';
-}
-function deixaBoto(cancel) {
-  const prem = S.prem; if (!prem) return;
-  S.prem = null; clearTimeout(prem.t);
-  esc.moduls.boto.userData.prem(false);
-  if (cancel || S.fase !== 'joc') { apagaLlum(); return; }
-  const cal = R.solucioBoto(S.b);
-  const bo = cal === 'clic' ? !prem.viva : prem.viva && R.LLUMS[prem.color].test(totalSegons() % 60);
-  apagaLlum();
-  if (bo) { S.boto = true; modulFet('boto'); } else error();
+  if (S.nivell.moduls.every((m) => S.fets.has(m))) acaba(true);
 }
 
 function esquerdes() {
@@ -198,7 +153,8 @@ function esquerdes() {
 function acaba(guanya, motiu = '') {
   S.quiet = restantMs();
   const t = totalSegons();
-  S.fase = 'fi'; S.prem = null;
+  S.fase = 'fi';
+  aturaModuls();
   document.body.dataset.fase = guanya ? 'salvada' : 'petada';
   $('#bomba').className = guanya ? 'salvada' : 'petada';
   $('#estat').textContent = guanya ? 'Bomba desactivada' : 'Bomba explotada';
@@ -211,7 +167,7 @@ function acaba(guanya, motiu = '') {
     esc.salvada(); so.guanya();
     $('#nota').hidden = false;
   } else {
-    const o = esc.origenDe(S.cables ? 'boto' : 'cables').clone(); o.z = 1;
+    const o = esc.origenDe(S.nivell.moduls.find((m) => !S.fets.has(m)) || S.nivell.moduls[0]).clone(); o.z = 1;
     esc.explota(o); so.explosio();
     esquerdes();
     setTimeout(() => { $('#nota').hidden = false; const b = document.querySelector('.nivell'); if (b) b.focus(); }, senseMoviment ? 300 : 3200);

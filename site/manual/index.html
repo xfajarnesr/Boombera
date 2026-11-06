@@ -37,36 +37,18 @@
       <dt>Número de sèrie</dt><dd>Són les dues xifres del final. A QTX-47, el número és 47 i la suma de xifres és 11. Les lletres no compten.</dd>
       <dt>Piles</dt><dd>Compta totes les que hi ha a la part de dalt de la bomba, entre 1 i 4.</dd>
       <dt>Indicadors</dt><dd>N'hi ha dos, amb una etiqueta de tres lletres. Cada un està encès o apagat, i l'etiqueta no canvia res.</dd>
+      <dt>Errors</dt><dd>Són els llums vermells de dalt a la dreta. Hi ha mòduls on canvien la resposta, així que digueu-vos-ho quan n'hi hagi un.</dd>
       <dt>Segons</dt><dd>Són les dues últimes xifres del temporitzador. A 2:47, els segons són 47.</dd>
     </dl>
-    <footer class="peu-full"><span>Curtcircuit, regles <span data-versio>v1</span></span><span>Full 1 de 2</span></footer>
+    <footer class="peu-full"><span>Curtcircuit, regles <span data-versio>v1</span></span><span data-full></span></footer>
   </article>
 
-  <article class="full">
-    <h2 class="primer-titol">Mòdul de cables</h2>
-    <p class="to">Talla'n només un. Els altres també tenen família.</p>
-    <p>Hi ha de 3 a 5 cables, numerats d'esquerra a dreta. Pregunta de quin color és el primer, busca'n la fila i respon la pregunta. Els cables tallats per error continuen comptant com si estiguessin sencers.</p>
-    <table>
-      <thead><tr><th scope="col">Primer cable</th><th scope="col">Pregunta</th><th scope="col">Si és que sí, talla</th><th scope="col">Si és que no, talla</th></tr></thead>
-      <tbody id="t-cables"></tbody>
-    </table>
-
-    <h2>Mòdul del botó</h2>
-    <p class="to">El botó diu moltes coses. No és obligatori fer-li cas.</p>
-    <p>Pregunta quina paraula hi ha escrita i de quin color és. Fer <strong>clic</strong> és prémer i deixar anar de seguida. <strong>Mantenir</strong> és prémer sense deixar anar fins que s'encengui un llum al costat del botó.</p>
-    <table>
-      <thead><tr><th scope="col">Paraula</th><th scope="col">Condició</th><th scope="col">Si es compleix</th><th scope="col">Si no</th></tr></thead>
-      <tbody id="t-boto"></tbody>
-    </table>
-    <h3>Si l'has de mantenir</h3>
-    <p>Mira de quin color és el llum i deixa anar el botó quan els segons del temporitzador...</p>
-    <table class="llums">
-      <tbody id="t-llums"></tbody>
-    </table>
-    <footer class="peu-full"><span>Curtcircuit, regles <span data-versio>v1</span></span><span>Full 2 de 2</span></footer>
-  </article>
 </main>
 <script src="../comu/regles.js"></script>
+<script src="../moduls/cables/manual.js"></script>
+<script src="../moduls/boto/manual.js"></script>
+<script src="../moduls/sequencia/manual.js"></script>
+<script src="../moduls/memoria/manual.js"></script>
 <script src="manual.js"></script>
 </body>
 </html>
