@@ -235,8 +235,9 @@ const senseAnim = 150;
   await p.waitForTimeout(1500);
   assert((await total(p)) <= 12, 'el salt de temps');
   await captura(p, 'tensio');
-  const vermell = await p.evaluate(() => Number(getComputedStyle(document.documentElement).getPropertyValue('--alarma')));
-  assert(vermell > 0, 'alarma activa');
+  // Espera el canvi de color, perquè les màquines lentes poden trigar uns quants fotogrames.
+  await p.waitForFunction(() => Number(getComputedStyle(document.documentElement).getPropertyValue('--alarma')) > 0, null, { timeout: 15000 })
+    .catch(() => assert.fail('alarma activa'));
   await p.evaluate(() => { window.__ms = 2000; window.__salta(13000); });
   await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
