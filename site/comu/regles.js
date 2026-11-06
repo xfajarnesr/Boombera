@@ -1,6 +1,6 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 5;
+  const VERSIO = 6;
 
   const PARTIDA = { penalitzacio: 30, mantenirMs: 500 };
 
@@ -161,7 +161,7 @@
     { id: 'theta', nom: 'theta', valor: 22, d: 'M50 10C28 10 22 34 22 50C22 66 28 90 50 90C72 90 78 66 78 50C78 34 72 10 50 10ZM23 50H77' },
     { id: 'mi', nom: 'mi', valor: 9, d: 'M28 94V24M28 58C28 72 38 78 48 78C60 78 70 70 70 58V24M70 60C70 72 74 78 86 78' },
     { id: 'pi', nom: 'pi', valor: 14, d: 'M12 32C18 24 28 22 40 22H90M40 22C40 50 36 70 26 84M68 22C66 46 66 66 72 78C76 85 84 83 90 74' },
-    { id: 'delta', nom: 'delta', valor: 2, d: 'M50 12L90 86H10Z' },
+    { id: 'alef', nom: 'àlef', valor: 2, d: 'M22 14L80 86M78 12C82 34 72 46 56 50M44 52C28 56 22 70 24 88M12 88H36M66 86H90' },
     { id: 'sigma', nom: 'sigma', valor: 19, d: 'M80 26V14H20L54 50L20 86H80V74' },
     { id: 'infinit', nom: 'infinit', valor: 24, d: 'M50 50C40 34 30 28 22 28C10 28 6 42 6 50C6 58 10 72 22 72C30 72 40 66 50 50C60 34 70 28 78 28C90 28 94 42 94 50C94 58 90 72 78 72C70 72 60 66 50 50Z' },
     { id: 'arrel', nom: 'arrel', valor: 7, d: 'M8 58L22 50L40 86L58 14H94' },

@@ -28,7 +28,6 @@
       <p>Una tecla equivocada és un error i repeteix la ronda. Cada error, sigui on sigui, afegeix un salt: refeu el càlcul.</p>
     </div>
     ${anell(C.anell)}
-  </div>
-  <div class="apunts apunts-seq"><div><span>Piles + errors = salts</span><i></i></div><div><span>Sentit</span><i></i></div></div>`;
+  </div>`;
   };
 })();
