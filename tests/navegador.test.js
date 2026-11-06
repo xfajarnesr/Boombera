@@ -76,7 +76,8 @@ const senseAnim = 150;
     for (const m of [...moduls].sort(() => Math.random() - 0.5)) {
       assert.strictEqual(await fet(p, m), false);
       await proves[m].resol(p, R, b);
-      await p.waitForFunction((x) => document.querySelector('#fets').dataset[x] === 'true', m, { timeout: 8000 });
+      await p.waitForFunction((x) => document.querySelector('#fets').dataset[x] === 'true', m, { timeout: 8000 })
+        .catch(async (e) => { throw new Error(`${m} no queda resolt al nivell ${n + 1} (errors: ${await fusibles(p)}, fase: ${await p.evaluate(() => document.body.dataset.fase)}): ${e.message}`); });
     }
     await p.waitForFunction(() => document.body.dataset.fase === 'salvada', null, { timeout: 8000 });
     assert.strictEqual(await fusibles(p), 0);
