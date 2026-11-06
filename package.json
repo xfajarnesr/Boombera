@@ -1,0 +1,12 @@
+{
+  "name": "curtcircuit",
+  "private": true,
+  "scripts": {
+    "test": "node tests/regles.test.js && node tests/navegador.test.js",
+    "pdf": "node scripts/genera-pdf.js"
+  },
+  "devDependencies": {
+    "pdf-lib": "1.17.1",
+    "playwright": "1.63.0"
+  }
+}

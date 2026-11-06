@@ -1,0 +1,12 @@
+# Curtcircuit
+
+Joc d'aula en català inspirat en la idea de desactivar una bomba parlant. Parla a Xavi en català i de manera directa.
+
+- No copiïs cap text, taula, valor, símbol ni element gràfic del joc original, ni pugis el seu manual al repositori. El nom i l'aspecte han de continuar sent propis.
+- Les regles només es defineixen a `site/comu/regles.js`. El manual les ha de llegir d'allà, mai escriure-les a mà.
+- El joc no ha d'enllaçar el manual.
+- El manual no porta la llista de nombres primers: Xavi la té a part.
+- Abans de programar un mòdul nou, proposa'n les regles a Xavi i espera que les validi.
+- Incrementa `VERSIO` a `regles.js` quan canviïn les regles, perquè la placa i el manual ho mostren.
+- Els canvis van en branques, i a `main` només el que Xavi hagi aprovat. `main` es publica sol.
+- Passa `npm test` abans de pujar res.
