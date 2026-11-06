@@ -72,3 +72,29 @@ body { background: #3b3d3f; color-scheme: light; color: #000; font-family: var(-
   .full:last-child { break-after: auto; }
 }
 .full .nivells th, .full .nivells td { padding: 1.3mm 2.4mm; }
+.interruptors { width: 78%; }
+.interruptors td { padding: 1.3mm 2.4mm; }
+.pesos { display: flex; gap: 8mm; margin: 1mm 0 2mm; }
+.tira-pesos { display: flex; align-items: center; }
+.tira-pesos span { border: 1.2pt solid #000; margin-left: -1.2pt; width: 10mm; height: 8mm; display: flex; align-items: center; justify-content: center; font-family: var(--titols); font-weight: 700; font-size: 15pt; }
+.tira-pesos .titol-tira { border: 0; width: auto; margin: 0 2.5mm 0 0; font-family: var(--text); font-size: 10.5pt; }
+.exemple { font-size: 10.5pt; }
+.amb-venn { display: grid; grid-template-columns: 1fr 44mm; gap: 4mm; align-items: center; }
+.venn { width: 100%; display: block; font-family: var(--text); }
+.venn ellipse, .venn line { fill: none; stroke: #000; }
+.marc-venn { fill: none; stroke: #000; stroke-width: .8; }
+.trac-continu { stroke-width: 1.3; }
+.trac-discontinu { stroke-width: 1.3; stroke-dasharray: 6 3.2; }
+.trac-puntejat { stroke-width: 1.9; stroke-dasharray: .01 3.4; stroke-linecap: round; }
+.trac-doble { stroke-width: 3.6; }
+.venn .trac-doble-dins, .llegenda-venn .trac-doble-dins { stroke: #fff; stroke-width: 1.4; }
+.lletra-zona { font-family: var(--titols); font-weight: 700; font-size: 13px; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.nom-conjunt { font-size: 6.2px; font-weight: 700; dominant-baseline: middle; }
+.llegenda-venn { list-style: none; margin: 0 0 3mm; padding: 0; font-size: 10pt; }
+.llegenda-venn li { display: flex; align-items: center; gap: 2mm; margin-bottom: 1.4mm; }
+.llegenda-venn svg { width: 12mm; height: 3.2mm; flex-shrink: 0; }
+.llegenda-venn line { stroke: #000; }
+.accions-venn { display: grid; grid-template-columns: 7mm 1fr; gap: 1.6mm 1.5mm; margin: 0; font-size: 10pt; line-height: 1.25; }
+.accions-venn dt { font-family: var(--titols); font-weight: 700; font-size: 15pt; line-height: 1; }
+.accions-venn dd { margin: 0; }
+@media screen and (max-width: 800px) { .amb-venn { grid-template-columns: 1fr; } .pesos { flex-direction: column; gap: 2mm; } }

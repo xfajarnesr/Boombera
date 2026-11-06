@@ -17,7 +17,7 @@ for (const n of R.NIVELLS) {
 for (const m of R.MODULS) assert(R.NIVELLS.some((n) => n.moduls.includes(m)), `${m} no surt a cap nivell`);
 
 // Qualsevol bomba generada té una solució única a tots els mòduls.
-const vistos = { c: new Set(), p: new Set(), w: new Set(), n: new Set(), cat: new Set(), lab: new Set(), mor: new Set() };
+const vistos = { int: new Set(), rat: new Set(), c: new Set(), p: new Set(), w: new Set(), n: new Set(), cat: new Set(), lab: new Set(), mor: new Set() };
 for (let k = 0; k < 100000; k++) {
   const b = R.generaBomba();
   assert(b.numero >= 10 && b.numero <= 99 && b.piles >= 1 && b.piles <= 4);
@@ -26,8 +26,11 @@ for (let k = 0; k < 100000; k++) {
   for (const m of R.MODULS) proves[m].bomba(R, b);
   vistos.c.add(b.cables[0]); vistos.p.add(b.piles); vistos.w.add(b.boto.paraula); vistos.n.add(b.cables.length);
   vistos.lab.add(`${b.laberint.idx}:${b.piles}`); vistos.mor.add(b.morse.paraula);
+  vistos.int.add(R.filaInterruptors(b.interruptors.d).objectiu);
+  b.ratlles.cables.forEach((c) => vistos.rat.add(R.zonaRatlles(c)));
   b.memoria.etapes.forEach((e) => vistos.cat.add(R.categoriaMemoria(e.pantalla)));
 }
 assert(vistos.c.size === 5 && vistos.p.size === 4 && vistos.w.size === 4 && vistos.n.size === 3 && vistos.cat.size === 3);
+assert(vistos.int.size === 4 && vistos.rat.size === 16, 'surten totes les files dels interruptors i les 16 zones');
 assert(vistos.lab.size === 24 && vistos.mor.size === 12, 'surten tots els laberints, sortides i paraules');
 console.log('Generador: 100000 bombes correctes, amb una solució única a cada mòdul.');

@@ -15,6 +15,10 @@ import { crea3D as laberint3D } from './laberint/3d.js';
 import { creaJoc as laberintJoc } from './laberint/joc.js';
 import { crea3D as morse3D } from './morse/3d.js';
 import { creaJoc as morseJoc } from './morse/joc.js';
+import { crea3D as interruptors3D } from './interruptors/3d.js';
+import { creaJoc as interruptorsJoc } from './interruptors/joc.js';
+import { crea3D as ratlles3D } from './ratlles/3d.js';
+import { creaJoc as ratllesJoc } from './ratlles/joc.js';
 
 export const MODULS = {
   cables: { crea3D: cables3D, creaJoc: cablesJoc },
@@ -25,4 +29,6 @@ export const MODULS = {
   simbols: { crea3D: simbols3D, creaJoc: simbolsJoc },
   laberint: { crea3D: laberint3D, creaJoc: laberintJoc },
   morse: { crea3D: morse3D, creaJoc: morseJoc },
+  interruptors: { crea3D: interruptors3D, creaJoc: interruptorsJoc },
+  ratlles: { crea3D: ratlles3D, creaJoc: ratllesJoc },
 };

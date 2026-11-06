@@ -9,7 +9,38 @@ function oracle(b) {
   }
 }
 const total = (p) => p.evaluate(() => Number(document.querySelector('#temps').dataset.total));
+const tic = (p) => p.evaluate(() => Number(document.querySelector('#temps').dataset.tic || 0));
+// Espera dues passades del rellotge: llavors el temps pintat ja és el de veritat, encara que la màquina vagi lenta.
+async function rellotgeAlDia(p) {
+  const t = await tic(p);
+  await p.waitForFunction((x) => Number(document.querySelector('#temps').dataset.tic) >= x + 2, t);
+}
+// Un clic sec: baixa i puja dins el mateix pas de la pàgina, perquè en una màquina lenta no s'arribi a encendre la llum.
+const clicSec = (p) => p.evaluate(() => {
+  const b = document.querySelector('#boto');
+  const o = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0, pointerType: 'mouse' };
+  b.dispatchEvent(new PointerEvent('pointerdown', o));
+  b.dispatchEvent(new PointerEvent('pointerup', o));
+});
+// Mantén premut amb el ratolí de veritat. hover() espera que el botó estigui quiet, però si la càmera
+// encara es movia i el clic cau fora, s'aparta el ratolí (perquè no faci clic enlloc) i es torna a provar.
+async function mante(p) {
+  for (let k = 0; k < 4; k++) {
+    await p.locator('#boto').hover();
+    await p.mouse.down();
+    const premut = await p.waitForFunction(() => document.querySelector('#boto').dataset.premut === 'true', null, { timeout: 4000 }).then(() => true, () => false);
+    if (premut) return;
+    await p.mouse.move(2, 2);
+    await p.mouse.up();
+  }
+  throw new Error('el botó no queda premut després de 4 intents');
+}
+async function deixa(p) {
+  await p.mouse.up();
+  await p.waitForFunction(() => document.querySelector('#boto').dataset.premut === 'false');
+}
 module.exports = {
+  oracle, clicSec, mante, deixa, rellotgeAlDia,
   regles(R) {
     let casos = 0;
     const accions = new Set();
@@ -36,21 +67,21 @@ module.exports = {
   bomba(R, b) { assert.strictEqual(R.solucioBoto(b), oracle(b)); },
   llegeix: (p) => p.evaluate(() => ({ boto: { color: document.querySelector('#boto').dataset.color, paraula: document.querySelector('#boto').textContent } })),
   async resol(p, R, b) {
-    // hover() espera que el botó estigui quiet: si la càmera encara entra, el clic cauria fora.
-    await p.locator('#boto').hover();
-    await p.mouse.down();
-    if (R.solucioBoto(b) === 'clic') { await p.mouse.up(); return; }
+    if (R.solucioBoto(b) === 'clic') { await clicSec(p); return; }
+    await mante(p);
     await p.waitForFunction(() => document.querySelector('#llum').dataset.color);
     const llum = await p.evaluate(() => document.querySelector('#llum').dataset.color);
     // Amb el rellotge aturat es comprova la regla sense dependre de la velocitat de la màquina.
     await p.evaluate(() => window.__atura());
-    for (;;) {
+    await rellotgeAlDia(p);
+    for (let k = 0; k < 60; k++) {
       if (R.LLUMS[llum].test((await total(p)) % 60)) break;
       const abans = await total(p);
       await p.evaluate(() => window.__salta(1000));
       await p.waitForFunction((t) => Number(document.querySelector('#temps').dataset.total) !== t, abans);
+      await rellotgeAlDia(p);
     }
-    await p.mouse.up();
+    await deixa(p);
     await p.evaluate(() => window.__segueix());
   },
 };

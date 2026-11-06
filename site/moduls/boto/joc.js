@@ -14,6 +14,7 @@ export function creaJoc(ctx) {
     if (!ctx.actiu() || prem) return;
     const p = { viva: false, color: null };
     prem = p;
+    bt.dataset.premut = 'true';
     grup.userData.prem(true);
     p.t = setTimeout(() => {
       const c = Object.keys(R.LLUMS); p.color = c[Math.floor(Math.random() * c.length)]; p.viva = true;
@@ -25,6 +26,7 @@ export function creaJoc(ctx) {
   const deixaBoto = (cancel) => {
     const p = prem; if (!p) return;
     prem = null; clearTimeout(p.t);
+    bt.dataset.premut = 'false';
     grup.userData.prem(false);
     if (cancel || !ctx.actiu()) { apagaLlum(); return; }
     const cal = R.solucioBoto(b);

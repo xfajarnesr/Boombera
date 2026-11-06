@@ -219,8 +219,11 @@ document.addEventListener('fullscreenchange', pintaPantalla);
 pintaPantalla();
 
 /* ---------- Rellotge ---------- */
+let tics = 0;
 setInterval(() => {
   if (S.fase !== 'joc') return;
+  // Comptador de passades del rellotge: les proves l'esperen per saber que el temps pintat ja és l'actual.
+  $('#temps').dataset.tic = ++tics;
   const ms = restantMs();
   const i = 1 - Math.max(0, ms) / (S.nivell.segons * 1000);
   // La tensió també puja amb els errors.

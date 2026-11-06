@@ -1,6 +1,6 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 6;
+  const VERSIO = 7;
 
   const PARTIDA = { penalitzacio: 30, mantenirMs: 500 };
 
@@ -12,6 +12,7 @@
     { nom: 'Nivell 3', segons: 300, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria'] },
     { nom: 'Nivell 4', segons: 420, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'] },
     { nom: 'Nivell 5', segons: 480, errors: 2, moduls: ['cables', 'boto', 'memoria', 'simbols', 'laberint', 'morse'] },
+    { nom: 'Nivell 6', segons: 480, errors: 2, moduls: ['cables', 'boto', 'memoria', 'simbols', 'interruptors', 'ratlles'] },
   ];
 
   const COLORS_CABLE = {
@@ -74,6 +75,55 @@
     const r = REGLES_BOTO.find((x) => x.paraula === b.boto.paraula);
     return r.test(b) ? r.si : r.no;
   };
+
+  /* ---------- Interruptors ---------- */
+  // Cinc palanques que formen un nombre en binari. El visor mostra D; l'objectiu surt de la primera fila que es compleixi.
+  const INTERRUPTORS = { palanques: 5, pesos: [16, 8, 4, 2, 1], minim: 10, maxim: 98 };
+  const FILES_INTERRUPTORS = [
+    { condicio: 'D és múltiple de 4', objectiu: 'D dividit entre 4', test: (d) => d % 4 === 0, calcula: (d) => d / 4 },
+    { condicio: 'Si no, D és múltiple de 3', objectiu: 'D dividit entre 3', test: (d) => d % 3 === 0, calcula: (d) => d / 3 },
+    { condicio: 'Si no, D és múltiple de 5', objectiu: 'D dividit entre 5', test: (d) => d % 5 === 0, calcula: (d) => d / 5 },
+    { condicio: 'Cap de les anteriors', objectiu: 'la suma de les xifres de D', test: () => true, calcula: (d) => sumaXifres(d) },
+  ];
+  const filaInterruptors = (d) => FILES_INTERRUPTORS.find((f) => f.test(d));
+  const objectiuInterruptors = (d) => filaInterruptors(d).calcula(d);
+  // Sèrie parella: la palanca de l'esquerra val 16. Sèrie senar: la de la dreta.
+  const sentitInterruptors = (b) => (b.numero % 2 === 0 ? 'esquerra' : 'dreta');
+  // Posició de cada palanca, d'esquerra a dreta: true és amunt.
+  const solucioInterruptors = (b) => {
+    const t = objectiuInterruptors(b.interruptors.d);
+    const bits = INTERRUPTORS.pesos.map((p) => (t & p) !== 0);
+    return sentitInterruptors(b) === 'esquerra' ? bits : bits.reverse();
+  };
+
+  /* ---------- Cables amb ratlles ---------- */
+  const COLORS_RATLLES = { vermell: '#d3261e', blau: '#1f5fd6', groc: '#f0bb12', blanc: '#e9e9e2', negre: '#17181a' };
+  const RATLLES = { minim: 4, maxim: 6 };
+  // Els quatre conjunts del diagrama, en aquest ordre.
+  const CONJUNTS_RATLLES = [
+    { id: 'R', text: 'Té ratlles', test: (c) => Boolean(c.ratlla) },
+    { id: 'L', text: 'LED encès', test: (c) => c.led },
+    { id: 'P', text: 'La xifra de sota és primera', test: (c) => esPrimer(c.xifra) },
+    { id: 'V', text: 'Porta vermell', test: (c) => c.color === 'vermell' || c.ratlla === 'vermell' },
+  ];
+  const ACCIONS_RATLLES = {
+    T: { text: "Talla'l.", test: () => true },
+    N: { text: 'No el tallis.', test: () => false },
+    S: { text: "Talla'l si el número de sèrie és parell.", test: (b) => b.numero % 2 === 0 },
+    I: { text: "Talla'l si hi ha algun indicador encès.", test: (b) => b.indicadors.some((i) => i.ences) },
+    M: { text: "Talla'l si la xifra de sota és més gran que el nombre de piles.", test: (b, c) => c.xifra > b.piles },
+  };
+  // Cada zona del diagrama, escrita amb les lletres dels conjunts on és el cable ('' vol dir cap).
+  const ZONES_RATLLES = {
+    '': 'N', R: 'S', L: 'T', P: 'M', V: 'I',
+    RL: 'N', RP: 'T', RV: 'M', LP: 'I', LV: 'S', PV: 'T',
+    RLP: 'S', RLV: 'I', RPV: 'N', LPV: 'M', RLPV: 'T',
+  };
+  const zonaRatlles = (c) => CONJUNTS_RATLLES.filter((k) => k.test(c)).map((k) => k.id).join('');
+  const accioRatlles = (c) => ZONES_RATLLES[zonaRatlles(c)];
+  const calTallarRatlles = (b, c) => ACCIONS_RATLLES[accioRatlles(c)].test(b, c);
+  // Índexs dels cables que s'han de tallar, d'esquerra a dreta.
+  const solucioRatlles = (b) => b.ratlles.cables.map((c, i) => (calTallarRatlles(b, c) ? i : -1)).filter((i) => i >= 0);
 
   /* ---------- Seqüència ---------- */
   const SEQUENCIA = {
@@ -315,6 +365,29 @@
   }
   const generaMorse = (rng) => ({ paraula: tria(MORSE.paraules, rng).paraula });
 
+  function generaInterruptors(rng, b) {
+    const { minim, maxim, palanques } = INTERRUPTORS;
+    const d = minim + Math.floor(rng() * (maxim - minim + 1));
+    const bona = solucioInterruptors({ ...b, interruptors: { d } }).join();
+    let inici;
+    do { inici = Array.from({ length: palanques }, () => rng() < 0.5); } while (inici.join() === bona);
+    return { d, inici };
+  }
+  function generaRatlles(rng, b) {
+    const colors = Object.keys(COLORS_RATLLES);
+    const n = RATLLES.minim + Math.floor(rng() * (RATLLES.maxim - RATLLES.minim + 1));
+    for (;;) {
+      const cables = Array.from({ length: n }, () => {
+        const color = tria(colors, rng);
+        const ratlla = rng() < 0.5 ? tria(colors.filter((c) => c !== color), rng) : null;
+        return { color, ratlla, led: rng() < 0.5, xifra: 1 + Math.floor(rng() * 9) };
+      });
+      // Com a mínim un per tallar i un per deixar.
+      const talls = solucioRatlles({ ...b, ratlles: { cables } }).length;
+      if (talls >= 1 && talls < n) return { cables };
+    }
+  }
+
   function generaBomba(rng = Math.random) {
     const noms = Object.keys(COLORS_CABLE);
     const n = 3 + Math.floor(rng() * 3);
@@ -324,10 +397,12 @@
     const numero = 10 + Math.floor(rng() * 90);
     const etiquetes = [...ETIQUETES].sort(() => rng() - 0.5).slice(0, 2);
     const piles = 1 + Math.floor(rng() * 4);
+    const indicadors = etiquetes.map((etiqueta) => ({ etiqueta, ences: rng() < 0.5 }));
+    const carcassa = { numero, piles, indicadors };
     return {
       lletres, numero, cables,
       piles,
-      indicadors: etiquetes.map((etiqueta) => ({ etiqueta, ences: rng() < 0.5 })),
+      indicadors,
       boto: { color: tria(Object.keys(COLORS_BOTO), rng), paraula: tria(PARAULES, rng) },
       sequencia: generaSequencia(rng),
       memoria: generaMemoria(rng),
@@ -335,6 +410,8 @@
       simbols: generaSimbols(rng),
       laberint: generaLaberint(rng, piles),
       morse: generaMorse(rng),
+      interruptors: generaInterruptors(rng, carcassa),
+      ratlles: generaRatlles(rng, carcassa),
     };
   }
 
@@ -342,13 +419,15 @@
     VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
     reglaCables, solucioCables, solucioBoto, generaBomba,
-    MODULS: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse'],
+    MODULS: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'],
     SEQUENCIA, saltsSequencia, sentitSequencia, respostaSequencia,
     MEMORIA, CATEGORIES_MEMORIA, REGLES_MEMORIA, categoriaMemoria, textMemoria, solucioMemoria,
     CONTRASENYA, paraulesDeRodets, triaContrasenya, solucioContrasenya,
     SIMBOLS, GRUIX_SIMBOL, PLAQUES, simbol, sumaSimbols, sentitSimbols, solucioSimbols,
     LABERINT, LABERINTS, DIRECCIONS, casella, nomCasella, obert, mouLaberint, identificaLaberint, sortidaLaberint, distancies,
     MORSE, canalDe, canalMorse,
+    INTERRUPTORS, FILES_INTERRUPTORS, filaInterruptors, objectiuInterruptors, sentitInterruptors, solucioInterruptors,
+    COLORS_RATLLES, RATLLES, CONJUNTS_RATLLES, ACCIONS_RATLLES, ZONES_RATLLES, zonaRatlles, accioRatlles, calTallarRatlles, solucioRatlles, esPrimer,
   };
   if (typeof module !== 'undefined') module.exports = api;
   else arrel.Curtcircuit = api;

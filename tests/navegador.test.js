@@ -157,6 +157,7 @@ const senseAnim = 150;
     return pos;
   };
   q = await juga();
+  await fotogrames(p);
   await captura(p, 'laberint-morse');
   const paraulaMorse = proves.morse.desxifra(await proves.morse.observa(p));
   const canalBo = proves.morse.oracle(paraulaMorse, q.numero, q.piles);
@@ -180,6 +181,57 @@ const senseAnim = 150;
   await Lab.resol(p, R, q);
   await p.waitForFunction(() => document.querySelector('#fets').dataset.laberint === 'true');
   console.log('Senyal: un canal equivocat és error. Laberint: una paret és error i la llum no es mou. Tots dos es resolen.');
+  await p.evaluate(() => { window.__salta(600000); });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
+
+  // Interruptors i cables amb ratlles: errors reals i com es queda cada mòdul després.
+  const NOUS = R.NIVELLS.findIndex((n) => ['interruptors', 'ratlles'].every((m) => n.moduls.includes(m)));
+  assert(NOUS >= 0, 'hi ha un nivell amb interruptors i cables amb ratlles');
+  const Int = proves.interruptors; const Rat = proves.ratlles;
+  const jugaNous = async () => {
+    await nivell(p, NOUS);
+    await p.waitForFunction(() => document.body.dataset.fase === 'joc' && document.querySelector('#interruptors') && document.querySelector('.ratllat'));
+    return llegeix(p, R.NIVELLS[NOUS].moduls);
+  };
+  q = await jugaNous();
+  await fotogrames(p);
+  await captura(p, 'interruptors-ratlles');
+  // Una combinació equivocada: error, i les palanques es queden on són.
+  const { d } = await Int.estat(p);
+  const bonaInt = Int.oracle(d, q.numero);
+  const dolentaInt = bonaInt.map((a, i) => (i === 2 ? !a : a));
+  await Int.posa(p, dolentaInt);
+  await p.locator('.fixa').dispatchEvent('click');
+  await p.waitForFunction(() => Number(document.querySelector('#errors').dataset.n) === 1);
+  assert.strictEqual(await fet(p, 'interruptors'), false);
+  assert.deepStrictEqual((await Int.estat(p)).palanques, dolentaInt, 'les palanques es queden com estaven');
+  await Int.posa(p, bonaInt);
+  await p.locator('.fixa').dispatchEvent('click');
+  await p.waitForFunction(() => document.querySelector('#fets').dataset.interruptors === 'true');
+  // Tallar un cable que no toca és el segon error: el nivell peta.
+  const bonsRat = Rat.oracle(q, q.ratlles.cables);
+  const dolentRat = q.ratlles.cables.findIndex((_, i) => !bonsRat.includes(i));
+  await p.locator(`.ratllat[data-i="${dolentRat}"]`).dispatchEvent('click');
+  await p.waitForFunction(() => document.body.dataset.fase === 'petada');
+  assert.strictEqual(await fusibles(p), 2);
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  // Ara al revés: un cable equivocat és un error, es queda tallat, i el mòdul no es resol fins a l'últim bo.
+  q = await jugaNous();
+  const bons2 = Rat.oracle(q, q.ratlles.cables);
+  const dolent2 = q.ratlles.cables.findIndex((_, i) => !bons2.includes(i));
+  await p.locator(`.ratllat[data-i="${dolent2}"]`).dispatchEvent('click');
+  await p.waitForFunction(() => Number(document.querySelector('#errors').dataset.n) === 1);
+  assert.strictEqual(await p.getAttribute(`.ratllat[data-i="${dolent2}"]`, 'data-tallat'), 'true', 'el cable es queda tallat');
+  assert.strictEqual(await fet(p, 'ratlles'), false);
+  for (const [k, i] of bons2.entries()) {
+    assert.strictEqual(await fet(p, 'ratlles'), false, 'encara falten cables');
+    await p.locator(`.ratllat[data-i="${i}"]`).dispatchEvent('click');
+    await p.waitForFunction((x) => document.querySelector(`.ratllat[data-i="${x}"]`).dataset.tallat === 'true', i);
+    if (k < bons2.length - 1) assert.strictEqual(await fusibles(p), 1, 'un cable bo no és error');
+  }
+  await p.waitForFunction(() => document.querySelector('#fets').dataset.ratlles === 'true');
+  assert.strictEqual(await fusibles(p), 1);
+  console.log("Interruptors: una combinació equivocada és error i les palanques es queden. Ratlles: un cable dolent és error i es queda tallat; el mòdul es resol amb l'últim bo.");
   await p.evaluate(() => { window.__salta(600000); });
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
 
@@ -255,15 +307,14 @@ const senseAnim = 150;
   console.log(`Un error resta ${t0 - t1} s.`);
 
   // Fer el contrari del que toca al botó és error.
-  await p.locator('#boto').hover();
-  await p.mouse.down();
   if (R.solucioBoto(b) === 'clic') {
+    await proves.boto.mante(p);
     await p.waitForFunction(() => document.querySelector('#llum').dataset.color);
-    await p.waitForTimeout(150);
     await captura(p, 'llum');
-  }
-  await p.mouse.up();
-  assert.strictEqual(await fusibles(p), 2);
+    await proves.boto.deixa(p);
+  } else await proves.boto.clicSec(p);
+  await p.waitForFunction(() => Number(document.querySelector('#errors').dataset.n) === 2);
+  assert.strictEqual(await fet(p, 'boto'), false);
   console.log("Fer l'acció contrària al botó és error.");
 
   // Tercer error: explota.
@@ -334,7 +385,7 @@ const senseAnim = 150;
   // El joc no enllaça el manual.
   assert.strictEqual(await p.locator('a[href*="manual"]').count(), 0, 'el joc no ha d\'enllaçar el manual');
 
-  // El manual surt de les dades, no porta la llista de primers i cap en cinc pàgines A4.
+  // El manual surt de les dades, no porta la llista de primers i cap en sis pàgines A4.
   await p.setViewportSize({ width: 1000, height: 1200 });
   await p.goto(urlManual);
   await p.waitForTimeout(200);
@@ -356,9 +407,29 @@ const senseAnim = 150;
   assert.strictEqual(await p.locator('svg.laberint .sortida').count(), 4 * R.LABERINTS.length);
   assert.strictEqual(await p.locator('.simbol .nom-simbol').count(), 0, 'el manual no posa nom als símbols');
   assert.strictEqual(await p.locator('.simbol svg path').count(), R.SIMBOLS.length);
+  for (const f of R.FILES_INTERRUPTORS) assert(text.includes(f.condicio) && text.includes(f.objectiu), f.condicio);
+  for (const c of R.CONJUNTS_RATLLES) assert(text.includes(c.text), c.text);
+  for (const a of Object.values(R.ACCIONS_RATLLES)) assert(text.includes(a.text), a.text);
+  // Cada lletra del diagrama cau de debò dins la zona que diu: es comprova amb la geometria de les el·lipses dibuixades.
+  const zones = await p.evaluate(() => {
+    const el = [...document.querySelectorAll('svg.venn ellipse')].filter((e) => !e.classList.contains('trac-doble-dins')).map((e) => {
+      const a = Number(e.getAttribute('transform').match(/rotate\(([-\d.]+)/)[1]) * Math.PI / 180;
+      return ['cx', 'cy', 'rx', 'ry'].reduce((o, k) => ({ ...o, [k]: Number(e.getAttribute(k)) }), { a });
+    });
+    const dins = (e, x, y) => { const c = Math.cos(e.a); const s = Math.sin(e.a); const u = ((x - e.cx) * c + (y - e.cy) * s) / e.rx; const v = (-(x - e.cx) * s + (y - e.cy) * c) / e.ry; return u * u + v * v < 1; };
+    return [...document.querySelectorAll('svg.venn .lletra-zona')].map((t) => {
+      const x = Number(t.getAttribute('x')); const y = Number(t.getAttribute('y'));
+      return { zona: t.dataset.zona, lletra: t.textContent, calc: el.map((e, k) => (dins(e, x, y) ? 'RLPV'[k] : '')).join('') };
+    });
+  });
+  assert.strictEqual(zones.length, 16);
+  for (const z of zones) {
+    assert.strictEqual(z.calc, z.zona, `la lletra de la zona «${z.zona}» cau a «${z.calc}»`);
+    assert.strictEqual(z.lletra, R.ZONES_RATLLES[z.zona]);
+  }
   assert(!/2, 3, 5(,| i) 7/.test(text), 'el manual no ha de portar la llista de primers');
   assert(text.includes(`v${R.VERSIO}`) && !text.includes('v1'), 'la versió ha de sortir de les regles');
-  const FULLS = 5;
+  const FULLS = 6;
   assert.strictEqual(await p.locator('.full').count(), FULLS);
   for (let k = 0; k < FULLS; k++) {
     const sobra = await p.locator('.full').nth(k).evaluate((f) => { const peu = f.querySelector('.peu-full').getBoundingClientRect(); const ant = f.querySelector('.peu-full').previousElementSibling.getBoundingClientRect(); return peu.top - ant.bottom; });
