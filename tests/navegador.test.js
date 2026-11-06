@@ -63,7 +63,7 @@ const senseAnim = 150;
   assert.strictEqual(await p.locator('.nivell').count(), R.NIVELLS.length);
 
   // Cada nivell arrenca amb el seu temps i es pot guanyar sense errors, amb tots els seus mòduls.
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < 2 * R.NIVELLS.length; k++) {
     const n = k % R.NIVELLS.length;
     const { moduls } = R.NIVELLS[n];
     await nivell(p, n);
@@ -83,13 +83,55 @@ const senseAnim = 150;
   }
   await p.waitForTimeout(400);
   await captura(p, 'guanya');
-  console.log('6 partides guanyades sense errors, dues amb els quatre mòduls.');
+  let q;
+  const SIS = R.NIVELLS.findIndex((n) => n.moduls.length === 6);
+  assert(SIS >= 0 && R.MODULS.every((m) => R.NIVELLS[SIS].moduls.includes(m)), 'hi ha d\'haver un nivell amb els sis mòduls');
+  console.log(`${2 * R.NIVELLS.length} partides guanyades sense errors, dues amb els sis mòduls.`);
+
+  // Contrasenya: enviar una paraula equivocada és error i no mou les lletres, i la bona resol el mòdul.
+  await nivell(p, SIS);
+  await p.waitForTimeout(800);
+  q = await llegeix(p, R.NIVELLS[SIS].moduls);
+  const rodets = await proves.contrasenya.llegeixRodets(p, R);
+  const bona = proves.contrasenya.oracle(rodets, q.numero);
+  const altra = proves.contrasenya.possibles(rodets).find((w) => w !== bona);
+  await proves.contrasenya.escriu(p, R, rodets, altra);
+  await p.locator('.envia-contrasenya').click();
+  assert.strictEqual(await fusibles(p), 1, "l'altra paraula possible és un error");
+  assert.strictEqual(await fet(p, 'contrasenya'), false);
+  assert.strictEqual(await proves.contrasenya.actual(p), altra, 'les lletres es queden com estaven');
+  await proves.contrasenya.escriu(p, R, rodets, bona);
+  await p.locator('.envia-contrasenya').click();
+  assert.strictEqual(await fet(p, 'contrasenya'), true);
+  console.log("Contrasenya: l'altra paraula és error, i les lletres es queden.");
+
+  // Símbols: una placa fora d'ordre és error i la seqüència torna a començar.
+  const plaques = await proves.simbols.llegeixPlaques(p);
+  const ordrePl = proves.simbols.oracle(plaques);
+  await p.locator(`.placa[data-i="${ordrePl[0]}"]`).click();
+  await p.locator(`.placa[data-i="${ordrePl[2]}"]`).click();
+  assert.strictEqual(await fusibles(p), 2);
+  assert.strictEqual(await p.evaluate(() => document.body.dataset.fase), 'petada', 'el nivell de sis mòduls peta amb 2 errors');
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await nivell(p, SIS);
+  await p.waitForTimeout(800);
+  const pl2 = await proves.simbols.llegeixPlaques(p);
+  const o2 = proves.simbols.oracle(pl2);
+  await p.locator(`.placa[data-i="${o2[0]}"]`).click();
+  await p.locator(`.placa[data-i="${o2[2]}"]`).click();
+  assert.strictEqual(await fusibles(p), 1);
+  assert.strictEqual(await fet(p, 'simbols'), false);
+  await proves.simbols.resol(p);
+  assert.strictEqual(await fet(p, 'simbols'), true);
+  console.log('Símbols: un error fa tornar a començar, i es pot acabar resolent.');
+  await p.evaluate(() => { window.__salta(600000); });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
 
   // Seqüència: una tecla equivocada és error, repeteix la ronda, i els salts pugen també amb errors d'altres mòduls.
   const QUATRE = R.NIVELLS.findIndex((n) => n.moduls.length === 4);
   await nivell(p, QUATRE);
   await p.waitForTimeout(1300);
-  let q = await llegeix(p);
+  q = await llegeix(p, R.NIVELLS[QUATRE].moduls);
   let f = await proves.sequencia.observa(p);
   await captura(p, 'sequencia-flaix');
   assert.strictEqual(f.length, R.SEQUENCIA.rondes[0]);
@@ -132,7 +174,7 @@ const senseAnim = 150;
   await p.locator(`.tecla-mem[data-i="${(npos1 + 1) % 4}"]`).click();
   assert.strictEqual(await fusibles(p), 1);
   assert.deepStrictEqual(await mem(), n0, 'torna a la mateixa etapa 1');
-  q = await llegeix(p);
+  q = await llegeix(p, R.NIVELLS[QUATRE].moduls);
   await proves.memoria.resol(p, R);
   await p.waitForFunction(() => document.querySelector('#fets').dataset.memoria === 'true');
   console.log("Memòria: un error torna a l'etapa 1 amb les mateixes pantalles, i es pot acabar resolent.");
@@ -224,7 +266,7 @@ const senseAnim = 150;
   // El joc no enllaça el manual.
   assert.strictEqual(await p.locator('a[href*="manual"]').count(), 0, 'el joc no ha d\'enllaçar el manual');
 
-  // El manual surt de les dades, no porta la llista de primers i cap en tres pàgines A4.
+  // El manual surt de les dades, no porta la llista de primers i cap en quatre pàgines A4.
   await p.setViewportSize({ width: 1000, height: 1200 });
   await p.goto(urlManual);
   await p.waitForTimeout(200);
@@ -236,24 +278,27 @@ const senseAnim = 150;
   for (const c of R.SEQUENCIA.anell) assert(text.includes(c), c);
   for (const c of Object.values(R.CATEGORIES_MEMORIA)) assert(text.includes(c), c);
   for (const f of R.REGLES_MEMORIA) for (const a of Object.values(f)) assert(text.includes(R.textMemoria(a)), R.textMemoria(a));
+  for (const w of R.CONTRASENYA.paraules) assert(text.includes(w), w);
+  for (const s of R.SIMBOLS) assert(text.includes(s.nom), s.nom);
+  assert.strictEqual(await p.locator('.simbol svg path').count(), R.SIMBOLS.length);
   assert(!/2, 3, 5(,| i) 7/.test(text), 'el manual no ha de portar la llista de primers');
   assert(text.includes(`v${R.VERSIO}`) && !text.includes('v1'), 'la versió ha de sortir de les regles');
-  assert.strictEqual(await p.locator('.full').count(), 3);
-  for (const k of [0, 1, 2]) {
+  assert.strictEqual(await p.locator('.full').count(), 4);
+  for (const k of [0, 1, 2, 3]) {
     const sobra = await p.locator('.full').nth(k).evaluate((f) => { const peu = f.querySelector('.peu-full').getBoundingClientRect(); const ant = f.querySelector('.peu-full').previousElementSibling.getBoundingClientRect(); return peu.top - ant.bottom; });
     assert(sobra >= -1, `full ${k + 1}: el contingut xoca amb el peu`);
   }
   const pdf = await p.pdf({ preferCSSPageSize: true, printBackground: true });
   const { PDFDocument } = require('pdf-lib');
   const doc = await PDFDocument.load(pdf);
-  assert.strictEqual(doc.getPageCount(), 3, 'el manual ha de tenir 3 pàgines');
+  assert.strictEqual(doc.getPageCount(), 4, 'el manual ha de tenir 4 pàgines');
   await p.emulateMedia({ media: 'print' });
-  for (const k of [0, 1, 2]) {
+  for (const k of [0, 1, 2, 3]) {
     const fora = await p.locator('.full').nth(k).evaluate((f) => f.scrollHeight - f.clientHeight);
     assert(fora <= 1, `full ${k + 1} es talla en imprimir: ${fora}px`);
   }
   await p.emulateMedia({ media: 'screen' });
-  console.log('El manual té 3 pàgines A4.');
+  console.log('El manual té 4 pàgines A4.');
 
   assert.deepStrictEqual(errs, [], 'errors de consola: ' + errs.join('; '));
   await nav.close();

@@ -1,6 +1,6 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 3;
+  const VERSIO = 4;
 
   const PARTIDA = { penalitzacio: 30, mantenirMs: 500 };
 
@@ -10,6 +10,7 @@
     { nom: 'Nivell 1', segons: 180, errors: 3, moduls: ['cables', 'boto'] },
     { nom: 'Nivell 2', segons: 240, errors: 3, moduls: ['cables', 'boto', 'sequencia'] },
     { nom: 'Nivell 3', segons: 300, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria'] },
+    { nom: 'Nivell 4', segons: 420, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'] },
   ];
 
   const COLORS_CABLE = {
@@ -127,6 +128,70 @@
     }
   };
 
+  /* ---------- Contrasenya ---------- */
+  const CONTRASENYA = {
+    rodets: 5, lletres: 4,
+    // En ordre alfabètic: l'ordre de la llista decideix quina de les dues paraules s'envia.
+    paraules: [
+      'ANGLE', 'ARREL', 'BOIRA', 'CARTA', 'CLAUS', 'CORBA',
+      'CREMA', 'DADES', 'DOTZE', 'EIXOS', 'ERROR', 'FERRO',
+      'FORMA', 'FOSCA', 'FUSTA', 'GRAUS', 'LLUMS', 'MARXA',
+      'MITJA', 'NEGRE', 'PLOMA', 'PORTA', 'QUART', 'RADIS',
+      'RECTA', 'SENAR', 'SETZE', 'SIGNE', 'SUMAR', 'TECLA',
+    ],
+  };
+  const paraulesDeRodets = (rodets) => CONTRASENYA.paraules.filter((p) => [...p].every((l, i) => rodets[i].includes(l)));
+  const triaContrasenya = ([primera, segona], numero) => (sumaXifres(numero) % 2 === 0 ? primera : segona);
+  const solucioContrasenya = (b) => triaContrasenya(paraulesDeRodets(b.contrasenya.rodets), b.numero);
+
+  /* ---------- Símbols ---------- */
+  // Dibuix en un quadrat de 100 x 100, només amb traços: el joc i el manual fan servir aquest mateix camí.
+  const espiral = () => {
+    let d = '';
+    for (let i = 0; i <= 60; i++) {
+      const a = (i / 60) * 4.5 * Math.PI; const r = 4 + (i / 60) * 38;
+      d += `${i ? 'L' : 'M'}${(50 + r * Math.cos(a)).toFixed(1)} ${(50 + r * Math.sin(a)).toFixed(1)}`;
+    }
+    return d;
+  };
+  const SIMBOLS = [
+    { id: 'alfa', nom: 'alfa', valor: 17, d: 'M74 24C68 50 60 78 40 78C24 78 16 66 16 52C16 36 26 24 42 24C62 24 66 58 86 78' },
+    { id: 'beta', nom: 'beta', valor: 5, d: 'M32 94V30C32 16 44 8 54 8C68 8 74 18 74 28C74 38 64 45 50 46C68 46 80 54 80 68C80 82 66 88 56 88C46 88 38 84 32 76' },
+    { id: 'theta', nom: 'theta', valor: 22, d: 'M50 10C28 10 22 34 22 50C22 66 28 90 50 90C72 90 78 66 78 50C78 34 72 10 50 10ZM23 50H77' },
+    { id: 'mi', nom: 'mi', valor: 9, d: 'M28 94V24M28 58C28 72 38 78 48 78C60 78 70 70 70 58V24M70 60C70 72 74 78 86 78' },
+    { id: 'pi', nom: 'pi', valor: 14, d: 'M12 32C18 24 28 22 40 22H90M40 22C40 50 36 70 26 84M68 22C66 46 66 66 72 78C76 85 84 83 90 74' },
+    { id: 'delta', nom: 'delta', valor: 2, d: 'M50 12L90 86H10Z' },
+    { id: 'sigma', nom: 'sigma', valor: 19, d: 'M80 26V14H20L54 50L20 86H80V74' },
+    { id: 'infinit', nom: 'infinit', valor: 24, d: 'M50 50C40 34 30 28 22 28C10 28 6 42 6 50C6 58 10 72 22 72C30 72 40 66 50 50C60 34 70 28 78 28C90 28 94 42 94 50C94 58 90 72 78 72C70 72 60 66 50 50Z' },
+    { id: 'arrel', nom: 'arrel', valor: 7, d: 'M8 58L22 50L40 86L58 14H94' },
+    { id: 'integral', nom: 'integral', valor: 12, d: 'M72 16C62 4 52 10 50 24V76C48 90 38 96 28 84' },
+    { id: 'mesmenys', nom: 'més o menys', valor: 20, d: 'M50 12V56M26 34H74M24 82H76' },
+    { id: 'diferent', nom: 'diferent', valor: 3, d: 'M18 36H82M18 64H82M68 12L32 88' },
+    { id: 'buit', nom: 'conjunt buit', valor: 15, d: 'M50 22A28 28 0 1 1 49.9 22ZM80 8L20 92' },
+    { id: 'pertot', nom: 'per a tot', valor: 10, d: 'M12 12L50 88L88 12M26 42H74' },
+    { id: 'angle', nom: 'angle', valor: 23, d: 'M78 14L14 84H90M50 84C50 70 44 58 36 60' },
+    { id: 'perpendicular', nom: 'perpendicular', valor: 6, d: 'M50 12V84M12 84H88' },
+    { id: 'dividit', nom: 'dividit', valor: 18, d: 'M14 50H86M43 22a7 7 0 1 0 14 0a7 7 0 1 0-14 0M43 78a7 7 0 1 0 14 0a7 7 0 1 0-14 0' },
+    { id: 'ona', nom: 'ona sinusoïdal', valor: 1, d: 'M6 50C18 4 32 4 50 50C68 96 82 96 94 50' },
+    { id: 'espiral', nom: 'espiral', valor: 13, d: espiral() },
+    { id: 'hexagon', nom: 'hexàgon', valor: 21, d: 'M50 10L85 30V70L50 90L15 70V30Z' },
+    { id: 'cercle', nom: 'cercle amb radi', valor: 8, d: 'M50 12A38 38 0 1 1 49.9 12ZM50 50V88M46 50a4 4 0 1 0 8 0a4 4 0 1 0-8 0' },
+    { id: 'cub', nom: 'cub', valor: 16, d: 'M14 36H60V84H14ZM14 36L36 14H84L60 36M84 14V62L60 84' },
+    { id: 'parabola', nom: 'paràbola amb eixos', valor: 4, d: 'M12 8V88H92M34 16C42 58 50 66 60 66C70 66 78 58 86 16' },
+    { id: 'quadrat', nom: 'quadrat amb diagonal', valor: 11, d: 'M14 14H86V86H14ZM14 86L86 14' },
+  ];
+  const GRUIX_SIMBOL = 9;
+  const PLAQUES = 4;
+  const simbol = (id) => SIMBOLS.find((s) => s.id === id);
+  const sumaSimbols = (plaques) => plaques.reduce((s, id) => s + simbol(id).valor, 0);
+  const sentitSimbols = (plaques) => (sumaSimbols(plaques) % 2 === 0 ? 'creixent' : 'decreixent');
+  // Retorna les posicions de les plaques en l'ordre en què s'han de prémer.
+  const solucioSimbols = (b) => {
+    const { plaques } = b.simbols;
+    const signe = sentitSimbols(plaques) === 'creixent' ? 1 : -1;
+    return plaques.map((_, i) => i).sort((x, y) => signe * (simbol(plaques[x]).valor - simbol(plaques[y]).valor));
+  };
+
   const tria = (llista, rng) => llista[Math.floor(rng() * llista.length)];
   const senseMesDeDos = (c) => c.every((x) => c.filter((y) => y === x).length <= 2);
 
@@ -154,6 +219,26 @@
     return { etapes };
   }
 
+  function generaContrasenya(rng) {
+    const { paraules, rodets: n, lletres } = CONTRASENYA;
+    for (;;) {
+      const [a, b] = barreja(paraules, rng);
+      // Les lletres de més surten de les que aquella posició té a la llista, perquè no es descartin d'entrada.
+      const rodets = Array.from({ length: n }, (_, i) => {
+        const r = new Set([a[i], b[i]]);
+        const candidates = [...barreja(paraules.map((p) => p[i]), rng), ...barreja(LLETRES.split(''), rng)];
+        for (const l of candidates) { if (r.size === lletres) break; r.add(l); }
+        return barreja([...r], rng);
+      });
+      if (paraulesDeRodets(rodets).length !== 2) continue;
+      let inici;
+      do { inici = rodets.map(() => Math.floor(rng() * lletres)); }
+      while (paraules.includes(inici.map((p, i) => rodets[i][p]).join('')));
+      return { rodets, inici };
+    }
+  }
+  const generaSimbols = (rng) => ({ plaques: barreja(SIMBOLS.map((s) => s.id), rng).slice(0, PLAQUES) });
+
   function generaBomba(rng = Math.random) {
     const noms = Object.keys(COLORS_CABLE);
     const n = 3 + Math.floor(rng() * 3);
@@ -169,6 +254,8 @@
       boto: { color: tria(Object.keys(COLORS_BOTO), rng), paraula: tria(PARAULES, rng) },
       sequencia: generaSequencia(rng),
       memoria: generaMemoria(rng),
+      contrasenya: generaContrasenya(rng),
+      simbols: generaSimbols(rng),
     };
   }
 
@@ -176,9 +263,11 @@
     VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
     reglaCables, solucioCables, solucioBoto, generaBomba,
-    MODULS: ['cables', 'boto', 'sequencia', 'memoria'],
+    MODULS: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'],
     SEQUENCIA, saltsSequencia, sentitSequencia, respostaSequencia,
     MEMORIA, CATEGORIES_MEMORIA, REGLES_MEMORIA, categoriaMemoria, textMemoria, solucioMemoria,
+    CONTRASENYA, paraulesDeRodets, triaContrasenya, solucioContrasenya,
+    SIMBOLS, GRUIX_SIMBOL, PLAQUES, simbol, sumaSimbols, sentitSimbols, solucioSimbols,
   };
   if (typeof module !== 'undefined') module.exports = api;
   else arrel.Curtcircuit = api;

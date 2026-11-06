@@ -7,10 +7,16 @@ import { crea3D as sequencia3D } from './sequencia/3d.js';
 import { creaJoc as sequenciaJoc } from './sequencia/joc.js';
 import { crea3D as memoria3D } from './memoria/3d.js';
 import { creaJoc as memoriaJoc } from './memoria/joc.js';
+import { crea3D as contrasenya3D } from './contrasenya/3d.js';
+import { creaJoc as contrasenyaJoc } from './contrasenya/joc.js';
+import { crea3D as simbols3D } from './simbols/3d.js';
+import { creaJoc as simbolsJoc } from './simbols/joc.js';
 
 export const MODULS = {
   cables: { crea3D: cables3D, creaJoc: cablesJoc },
   boto: { crea3D: boto3D, creaJoc: botoJoc },
   sequencia: { crea3D: sequencia3D, creaJoc: sequenciaJoc },
   memoria: { crea3D: memoria3D, creaJoc: memoriaJoc },
+  contrasenya: { crea3D: contrasenya3D, creaJoc: contrasenyaJoc },
+  simbols: { crea3D: simbols3D, creaJoc: simbolsJoc },
 };
