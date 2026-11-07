@@ -4,9 +4,9 @@
 
 Joc d'aula per equips, en català. L'Agent veu la bomba a la pantalla, la Guia té el manual (imprès o en una altra pantalla), i només poden parlar. Es pot instal·lar com a app al mòbil o a l'ordinador i funciona sense connexió.
 
-- **Joc:** https://xfajarnesr.github.io/Curtcircuit/
-- **Manual:** https://xfajarnesr.github.io/Curtcircuit/manual/
-- **Manual en PDF:** https://xfajarnesr.github.io/Curtcircuit/manual/Boombera-manual.pdf
+- **Joc:** https://xfajarnesr.github.io/Boombera/
+- **Manual:** https://xfajarnesr.github.io/Boombera/manual/
+- **Manual en PDF:** https://xfajarnesr.github.io/Boombera/manual/Boombera-manual.pdf
 
 ## Com funciona el codi
 
