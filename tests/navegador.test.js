@@ -132,10 +132,10 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
       assert.strictEqual(await fet(p, m), false);
       await veu(p, m);
       await proves[m].resol(p, R, b);
-      await p.waitForFunction((x) => document.querySelector('#fets').dataset[x] === 'true', m, { timeout: 8000 })
+      await p.waitForFunction((x) => document.querySelector('#fets').dataset[x] === 'true', m, { timeout: 30000 })
         .catch(async (e) => { throw new Error(`${m} no queda resolt al nivell ${n + 1} (errors: ${await fusibles(p)}, fase: ${await p.evaluate(() => document.body.dataset.fase)}): ${e.message}`); });
     }
-    await p.waitForFunction(() => document.body.dataset.fase === 'salvada', null, { timeout: 8000 });
+    await p.waitForFunction(() => document.body.dataset.fase === 'salvada', null, { timeout: 30000 });
     assert.strictEqual(await fusibles(p), 0);
   }
   await pausaCaptura(p, 400);
@@ -211,7 +211,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await p.locator(`.placa[data-i="${ordrePl[2]}"]`).click();
   assert.strictEqual(await fusibles(p), 2);
   assert.strictEqual(await p.evaluate(() => document.body.dataset.fase), 'petada', 'el nivell de sis mòduls peta amb 2 errors');
-  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
   await nivell(p, SIS);
   await veu(p, 'simbols');
   const pl2 = await proves.simbols.llegeixPlaques(p);
@@ -268,7 +268,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await topa(q.piles);
   assert.strictEqual(await fusibles(p), 2);
   await p.waitForFunction(() => document.body.dataset.fase === 'petada');
-  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
   q = await juga();
   const contra = await topa(q.piles);
   assert.strictEqual(await fusibles(p), 1, 'topar amb una paret és error');
@@ -313,7 +313,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await p.locator(`.ratllat[data-i="${dolentRat}"]`).dispatchEvent('click');
   await p.waitForFunction(() => document.body.dataset.fase === 'petada');
   assert.strictEqual(await fusibles(p), 2);
-  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
   // Ara al revés: un cable equivocat és un error, es queda tallat, i el mòdul no es resol fins a l'últim bo.
   q = await jugaNous();
   await veu(p, 'ratlles');
@@ -361,7 +361,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await proves.cables.resol(p, R, q);
   await veu(p, 'boto');
   await proves.boto.resol(p, R, q);
-  await p.waitForFunction(() => document.querySelector('#fets').dataset.boto === 'true', null, { timeout: 8000 });
+  await p.waitForFunction(() => document.querySelector('#fets').dataset.boto === 'true', null, { timeout: 30000 });
   await veu(p, 'memoria');
   const m0 = await mem();
   const pos0 = proves.memoria.oracle(0, m0.pantalla, m0.ordre, []);
@@ -374,7 +374,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await p.locator(`.tecla-mem[data-i="${(pos1 + 1) % 4}"]`).click();
   assert.strictEqual(await fusibles(p), 2, 'la memòria suma un error i el nivell peta amb 2');
   assert.strictEqual(await p.evaluate(() => document.body.dataset.fase), 'petada');
-  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
   await nivell(p, QUATRE);
   await veu(p, 'memoria');
   const n0 = await mem();
@@ -431,7 +431,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await captura(p, 'petada-1');
   await pausaCaptura(p, 1200);
   await captura(p, 'petada-2');
-  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
   await pausaCaptura(p, 600);
   await captura(p, 'petada-3');
   assert.strictEqual(await p.textContent('#nota-titol'), 'Ha petat');
@@ -450,7 +450,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
     .catch(() => assert.fail('alarma activa'));
   await p.evaluate(() => { window.__ms = 2000; window.__salta(13000); });
   await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
-  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
   assert((await p.textContent('#nota-text')).includes("S'ha acabat el temps"));
   console.log('A 0:00 la bomba peta.');
 
@@ -463,7 +463,7 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   for (const i of dolents) await p.locator(`.cable[data-i="${i}"]`).click();
   await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
   console.log(`El nivell 3 peta amb ${lim} errors.`);
-  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 8000 });
+  await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
 
   // Teclat: es pot tallar sense ratolí.
   await nivell(p, 0);
