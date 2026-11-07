@@ -2,8 +2,17 @@
 <html lang="ca">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Boombera</title>
+<meta name="description" content="Parla o peta: un joc per desactivar una bomba parlant.">
+<meta name="theme-color" content="#050506">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icones/icona.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icones/icona-iphone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Boombera">
 <link rel="stylesheet" href="comu/comu.css">
 <link rel="stylesheet" href="joc.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
@@ -35,6 +44,40 @@
   <div id="controls">
     <button id="so" type="button" aria-pressed="true"></button>
     <button id="pantalla" type="button"></button>
+    <button id="ajuda" type="button"></button>
+  </div>
+
+  <section id="portada" hidden aria-labelledby="portada-logo">
+    <h1 id="portada-logo" class="logo" aria-label="Boombera"></h1>
+    <p class="lema" id="portada-lema"></p>
+    <div class="portada-botons">
+      <button type="button" id="portada-missions" class="principal"></button>
+      <button type="button" id="portada-lliure"></button>
+    </div>
+    <p id="portada-equip" hidden></p>
+    <a id="portada-manual" href="manual/" target="_blank" rel="noopener"></a>
+  </section>
+
+  <div id="com-es-juga" role="dialog" aria-modal="true" aria-labelledby="cej-titol" hidden>
+    <div class="cej-capsa">
+      <p class="cej-etiqueta" id="cej-etiqueta"></p>
+      <div id="cej-dibuix" aria-hidden="true"></div>
+      <h2 id="cej-titol"></h2>
+      <p id="cej-text"></p>
+      <div class="cej-peu">
+        <span class="cej-punts" aria-hidden="true"><i></i><i></i><i></i></span>
+        <button type="button" id="cej-salta" class="enllac"></button>
+        <button type="button" id="cej-seguent" class="principal"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gira-mobil" role="alert">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="22" y="8" width="20" height="36" rx="3"/><path d="M14 50a26 12 0 0 0 36 0M44 46l6 4-6 4"/></svg>
+    <h2 id="gira-mobil-titol"></h2>
+    <p class="durant" id="gira-mobil-durant"></p>
+    <p class="abans" id="gira-mobil-abans"></p>
+    <button type="button" id="gira-mobil-torna" class="abans"></button>
   </div>
 
   <section id="nota" aria-labelledby="nota-titol">
@@ -66,6 +109,7 @@
       </form>
       <p class="avis" id="entra-avis" aria-live="polite"></p>
       <button type="button" id="sense-equip" class="enllac">Juga sense desar</button>
+      <button type="button" id="entra-torna" class="enllac">Torna a l'inici</button>
     </div>
     <form id="rols" hidden>
       <h3 id="rols-titol"></h3>
@@ -106,9 +150,12 @@
   <p id="sense3d" hidden>Aquest ordinador no pot mostrar gràfics 3D. Prova-ho amb un altre navegador o activa l'acceleració gràfica.</p>
 </main>
 <script src="comu/regles.js"></script>
+<script src="comu/textos.js"></script>
+<script src="comu/logo.js"></script>
 <script src="comu/config.js"></script>
 <script src="comu/codis.js"></script>
 <script src="dades/nucli.js"></script>
 <script type="module" src="joc.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

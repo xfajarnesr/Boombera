@@ -2,9 +2,11 @@
   "name": "curtcircuit",
   "private": true,
   "scripts": {
-    "test": "node tests/regles.test.js && node tests/dades.test.js && node tests/equips.test.js && node tests/navegador.test.js",
+    "test": "node tests/regles.test.js && node tests/dades.test.js && node tests/app.test.js && node tests/equips.test.js && node tests/navegador.test.js",
     "pdf": "node scripts/genera-pdf.js",
-    "apps-script": "node scripts/apps-script.js"
+    "apps-script": "node scripts/apps-script.js",
+    "app": "node scripts/app.js",
+    "icones": "node scripts/icones.js"
   },
   "devDependencies": {
     "pdf-lib": "1.17.1",

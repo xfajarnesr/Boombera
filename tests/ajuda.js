@@ -5,7 +5,7 @@ const R = require('../site/comu/regles.js');
 const http = require('http');
 const fs = require('fs');
 const SITE = path.join(__dirname, '..', 'site');
-const TIPUS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2' };
+const TIPUS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.pdf': 'application/pdf' };
 const servidor = http.createServer((q, r) => {
   const ruta = decodeURIComponent(q.url.split('?')[0]);
   if (ruta === '/comu/codis.js') { r.writeHead(200, { 'Content-Type': 'text/javascript' }); r.end(codisProva); return; }
@@ -111,6 +111,9 @@ const rellotge = (ms) => `(() => {
   window.__atura = () => { fix = ara(); };
   window.__segueix = () => { salt += fix - ara(); fix = null; };
 })();`;
+// La portada i el «Com es juga» ja s'han vist: les proves que només juguen van directes a les missions.
+// tests/app.test.js és el que prova la portada, el «Com es juga» i l'app.
+const saltaIntro = `try { sessionStorage.setItem('boombera.portada', '1'); localStorage.setItem('boombera.comEsJuga', '1'); } catch (e) {}`;
 // El mode demostració (tot obert, sense equip ni desar) per a les proves que només juguen.
 const modeDemo = `sessionStorage.setItem('boombera.mode', ${JSON.stringify(JSON.stringify(CODIS_PROVA.demo))});`;
 const ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
@@ -123,4 +126,4 @@ async function espera(f, que, ms = 20000) {
     await new Promise((ok) => setTimeout(ok, 50));
   }
 }
-module.exports = { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, llegeixCarcassa, llegeix, idx, total, fusibles, fet, captura, fotogrames, nivell, pausaCaptura, SITE, R, CODIS_PROVA, rellotge, modeDemo, ARGS, espera };
+module.exports = { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, llegeixCarcassa, llegeix, idx, total, fusibles, fet, captura, fotogrames, nivell, pausaCaptura, SITE, R, CODIS_PROVA, rellotge, modeDemo, saltaIntro, ARGS, espera };

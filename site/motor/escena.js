@@ -68,7 +68,9 @@ export function creaEscena(canvas, senseMoviment) {
   const dianes = new Map();
   const ptr = { x: 0, y: 0, sx: 0, sy: 0 };
   let dist = 40; let entrada = 0;
+  // La càmera segueix una mica el ratolí. Amb el dit no: cada toc la faria saltar.
   window.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
     ptr.x = (e.clientX / window.innerWidth - 0.5) * 2; ptr.y = (e.clientY / window.innerHeight - 0.5) * 2;
   });
 
@@ -470,7 +472,7 @@ export function creaEscena(canvas, senseMoviment) {
       const pos = [50, 225, 375]; const esc = 2.14;
       xifres.forEach((x, i) => {
         Object.entries(SEG).forEach(([k, pts]) => {
-          const on = XF[Number(x)].includes(k);
+          const on = (x === '-' ? 'g' : XF[Number(x)]).includes(k); // «-»: el visor en espera de la portada
           llum.fillStyle = on ? color : fantasma;
           llum.shadowColor = on ? color : 'transparent'; llum.shadowBlur = on ? 18 : 0;
           llum.beginPath();

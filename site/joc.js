@@ -5,6 +5,7 @@ import { MODULS } from './moduls/registre.js';
 import { creaDades, quinCodi, modeDesat, desaMode } from './dades/dades.js';
 
 const R = window.Curtcircuit;
+const T = window.BoomberaTextos.T;
 const $ = (s) => document.querySelector(s);
 const senseMoviment = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const so = creaSo();
@@ -193,7 +194,7 @@ function acaba(guanya, motiu = '') {
     ? `<p>Marge de ${format(t)} i ${errs}.${despres}</p>`
     : `<p>${motiu}${despres}</p>`;
   pintaInici();
-  mostra('missions');
+  mostra(S.nivell.lliure && panellInicial() === 'entra' ? 'lliure' : 'missions');
   if (guanya) {
     esc.salvada(); so.guanya();
     $('#nota').hidden = false;
@@ -219,13 +220,22 @@ const seccionsObertes = () => (totObert() ? R.SECCIONS.map((_, i) => i + 1) : R.
 
 const PANELLS = { entra: '#entra', missions: '#tria', rols: '#rols', lliure: '#lliure', codi: '#codi' };
 function mostra(panell) {
+  // La portada és fora de la nota: en sortir-ne, la nota torna a aparèixer.
+  const portada = panell === 'portada'; const deLaPortada = document.body.dataset.panell === 'portada';
+  if (portada) $('#nota').hidden = true;
+  else if (deLaPortada) $('#nota').hidden = false;
+  $('#portada').hidden = !portada;
   Object.entries(PANELLS).forEach(([k, sel]) => { $(sel).hidden = k !== panell; });
   document.body.dataset.panell = panell;
+  if (portada) pintaPortada();
+  else if (deLaPortada && esc) esc.posaTemps(format(totalSegons()), false);
   $('#equip-barra').hidden = !ambEquip() || panell === 'entra';
   const focus = { entra: '#entra form:not([hidden]) input', rols: '#rols-comenca', lliure: '#lliure input:not(:disabled)', codi: '#codi-text' }[panell];
   if (focus && !$('#nota').hidden && $(focus)) $(focus).focus();
 }
 const panellInicial = () => (S.mode === 'demo' || dades.equip || S.convidat ? 'missions' : 'entra');
+// Sense equip, «Torna» porta a la portada; amb equip, a les missions.
+const panellTorna = () => (panellInicial() === 'entra' ? 'portada' : 'missions');
 
 function preparaInici() {
   pintaInici();
@@ -235,8 +245,10 @@ function preparaInici() {
   lliguesCodi();
   pintaLliure();
   dades.escolta(() => { if (S.fase !== 'joc') pintaInici(); });
-  if (lliureDeUrl() && panellInicial() === 'missions') obreLliure(true);
-  else mostra(panellInicial());
+  lliguesPortada();
+  // Un enllaç de missió lliure va directe a la missió: no cal equip. La portada surt una vegada per pestanya.
+  if (lliureDeUrl()) obreLliure(true);
+  else mostra(portadaVista() ? panellInicial() : 'portada');
 }
 const lliureDeUrl = () => { const q = new URLSearchParams(location.search); return q.has('m') ? R.missioLliure(q.get('m').split(','), Number(q.get('t')), Number(q.get('e'))) : null; };
 const escapa = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -285,7 +297,7 @@ function lliguesMissions() {
     const b = e.target.closest('.nivell');
     if (!b || b.disabled) return;
     const n = R.NIVELLS[Number(b.dataset.nivell)];
-    if (ambEquip()) obreRols(n); else { S.rols = null; comenca(n); }
+    if (ambEquip()) obreRols(n); else { S.rols = null; vols(n); }
   });
 }
 
@@ -339,6 +351,7 @@ function lliguesEntra() {
     entra(await espera(e.target, () => dades.recuperaEquip($('#recupera-nom').value)));
   });
   $('#sense-equip').addEventListener('click', () => { S.convidat = new Set(); pintaInici(); mostra('missions'); });
+  $('#entra-torna').addEventListener('click', () => mostra('portada'));
   $('#canvia-equip').addEventListener('click', () => {
     dades.surt(); S.convidat = null;
     $('#nou-equip').reset(); $('#recupera-equip').reset();
@@ -396,7 +409,7 @@ function lliguesRols() {
     comprovaRols();
     if ($('#rols-comenca').disabled) return;
     S.rols = { agent: $('#rol-agent').value, guia: $('#rol-guia').value };
-    comenca(rolsNivell);
+    vols(rolsNivell);
   });
 }
 
@@ -430,8 +443,8 @@ function desaPartida(guanya, t) {
 function lliguesCodi() {
   let tocs = []; let abans = 'missions';
   const obre = () => { if (S.fase === 'joc' || document.body.dataset.panell === 'codi') return; abans = document.body.dataset.panell; $('#codi').reset(); avis('#codi-avis', null); mostra('codi'); };
-  $('#nota').addEventListener('click', (e) => {
-    if (!e.target.closest('.lema')) return;
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('.lema') || S.fase === 'joc') return;
     const ara = performance.now(); tocs = tocs.filter((x) => ara - x < 2500); tocs.push(ara);
     if (tocs.length >= 5) { tocs = []; obre(); }
   });
@@ -479,7 +492,7 @@ function pintaLliure() {
     desaUrl(m);
     try { await navigator.clipboard.writeText(location.href); $('#lliure-avis').textContent = 'Enllaç copiat.'; } catch { $('#lliure-avis').textContent = `Copieu l'enllaç de la barra d'adreces.`; }
   });
-  f.addEventListener('submit', (e) => { e.preventDefault(); const m = llegeixLliure(); if (m) { S.rols = null; comenca(m); } else avisLliure(m); });
+  f.addEventListener('submit', (e) => { e.preventDefault(); const m = llegeixLliure(); if (m) { S.rols = null; vols(m); } else avisLliure(m); });
   if (deUrl && deUrl.moduls.some((m) => !modulsOberts().includes(m))) $('#lliure-avis').textContent = "Alguns mòduls de l'enllaç encara no són oberts per a vosaltres.";
 }
 function llegeixLliure() {
@@ -495,8 +508,8 @@ function desaUrl(m) {
   try { history.replaceState(null, '', u); } catch { /* en una pàgina incrustada pot no deixar-ho */ }
 }
 function obreLliure(obre) {
-  mostra(obre ? 'lliure' : 'missions');
-  if (!obre) $('#obre-lliure').focus();
+  mostra(obre ? 'lliure' : panellTorna());
+  if (!obre && !$('#nota').hidden && !$('#tria').hidden) $('#obre-lliure').focus();
 }
 
 /* ---------- So ---------- */
@@ -525,13 +538,111 @@ const pintaPantalla = () => {
   btPantalla.setAttribute('aria-label', enPantallaCompleta() ? 'Surt de la pantalla completa' : 'Pantalla completa');
   btPantalla.title = btPantalla.getAttribute('aria-label');
 };
-if (!document.fullscreenEnabled) btPantalla.hidden = true;
+// A l'iPhone el navegador no té pantalla completa, i l'app instal·lada ja s'obre a pantalla completa.
+if (!document.fullscreenEnabled || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) btPantalla.hidden = true;
 btPantalla.addEventListener('click', () => {
   const p = enPantallaCompleta() ? document.exitFullscreen() : document.documentElement.requestFullscreen();
   if (p && p.catch) p.catch(() => {});
 });
 document.addEventListener('fullscreenchange', pintaPantalla);
 pintaPantalla();
+
+/* ---------- Portada ---------- */
+// Penombra amb la bomba al fons, el logo, el lema i dos botons. Surt la primera vegada a cada pestanya.
+const guarda = (magatzem, k, v) => { try { magatzem.setItem(k, v); } catch { /* navegador sense emmagatzematge */ } };
+const llegeix = (magatzem, k) => { try { return magatzem.getItem(k); } catch { return null; } };
+const portadaVista = () => llegeix(sessionStorage, 'boombera.portada') === '1';
+function pintaPortada() {
+  const e = ambEquip() ? dades.equip : null;
+  const p = $('#portada-equip');
+  const mode = S.mode === 'demo' ? T.portada.demo : S.mode === 'obre' ? T.portada.obre : '';
+  p.hidden = !e && !mode;
+  p.innerHTML = [e ? `<span>${T.portada.equip}</span> <b>${escapa(e.nom)}</b>` : '', mode ? `<i>${mode}</i>` : ''].filter(Boolean).join(' · ');
+  if (esc) esc.posaTemps('--:--', true);
+}
+function lliguesPortada() {
+  $('#portada-logo').innerHTML = `<span>B</span>${window.BoomberaLogo.visor()}<span>MBERA</span>`;
+  $('#portada-lema').textContent = T.lema;
+  $('#portada-missions').textContent = T.portada.missions;
+  $('#portada-lliure').textContent = T.portada.lliure;
+  $('#portada-manual').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h6"/></svg>${T.portada.manual}`;
+  $('#portada-manual').title = T.portada.manualTitol;
+  const surt = (cap) => () => {
+    guarda(sessionStorage, 'boombera.portada', '1');
+    const ves = () => (cap === 'lliure' ? obreLliure(true) : mostra(panellInicial()));
+    if (llegeix(localStorage, 'boombera.comEsJuga') === '1') ves(); else obreComEsJuga(ves);
+  };
+  $('#portada-missions').addEventListener('click', surt('missions'));
+  $('#portada-lliure').addEventListener('click', surt('lliure'));
+}
+
+/* ---------- Com es juga ---------- */
+// Tres passos la primera vegada en aquest navegador. Després es torna a obrir amb el botó «?».
+const DIBUIXOS = [
+  '<svg viewBox="0 0 200 90"><rect x="18" y="18" width="62" height="42" rx="3" class="d-pantalla"/><circle cx="49" cy="39" r="11" class="d-vermell"/><path d="M41 66h16" class="d-linia"/><path d="M128 20h44v56h-44z" class="d-llibre"/><path d="M136 32h28M136 42h28M136 52h20" class="d-linia"/><text x="49" y="86" class="d-nom">Agent</text><text x="150" y="88" class="d-nom">Guia</text></svg>',
+  '<svg viewBox="0 0 200 90"><circle cx="62" cy="34" r="12" class="d-cap"/><path d="M44 80c0-16 8-26 18-26s18 10 18 26" class="d-cos"/><circle cx="138" cy="34" r="12" class="d-cap"/><path d="M120 80c0-16 8-26 18-26s18 10 18 26" class="d-cos"/><path d="M100 18v66" class="d-mur"/><path d="M84 22c6-6 6-14 0-20M90 26c10-9 10-21 0-30" class="d-veu"/><path d="M116 22c-6-6-6-14 0-20M110 26c-10-9-10-21 0-30" class="d-veu"/></svg>',
+  '<svg viewBox="0 0 200 90"><rect x="40" y="26" width="120" height="40" rx="5" class="d-pantalla"/><circle cx="74" cy="46" r="10" class="d-vermell"/><circle cx="100" cy="46" r="10" class="d-apagat"/><circle cx="126" cy="46" r="10" class="d-apagat"/><path d="M60 80l12-6M128 74l12 6" class="d-linia"/></svg>',
+];
+let cejPas = 0; let cejDespres = null; let cejAbans = null;
+function pintaComEsJuga() {
+  const c = T.comEsJuga; const p = c.passos[cejPas]; const ultim = cejPas === c.passos.length - 1;
+  $('#cej-etiqueta').textContent = `${c.titol} · ${cejPas + 1}/${c.passos.length}`;
+  $('#cej-dibuix').innerHTML = DIBUIXOS[cejPas];
+  $('#cej-titol').textContent = p.titol;
+  $('#cej-text').innerHTML = p.text;
+  $('#cej-seguent').textContent = ultim ? c.final : c.seguent;
+  $('#cej-salta').textContent = cejDespres ? c.salta : c.tanca;
+  $('#cej-salta').hidden = ultim && !cejDespres;
+  $('#com-es-juga').dataset.pas = cejPas + 1;
+  document.querySelectorAll('.cej-punts i').forEach((i, k) => { i.dataset.actiu = String(k === cejPas); });
+}
+function obreComEsJuga(despres = null) {
+  cejPas = 0; cejDespres = despres; cejAbans = document.activeElement;
+  pintaComEsJuga();
+  $('#com-es-juga').hidden = false; document.body.dataset.ajuda = 'true';
+  $('#cej-seguent').focus();
+}
+function tancaComEsJuga() {
+  guarda(localStorage, 'boombera.comEsJuga', '1');
+  $('#com-es-juga').hidden = true; document.body.dataset.ajuda = 'false';
+  const f = cejDespres; cejDespres = null;
+  if (f) f(); else if (cejAbans && cejAbans.focus) cejAbans.focus();
+}
+$('#cej-seguent').addEventListener('click', () => {
+  if (cejPas < T.comEsJuga.passos.length - 1) { cejPas += 1; pintaComEsJuga(); $('#cej-seguent').focus(); } else tancaComEsJuga();
+});
+$('#cej-salta').addEventListener('click', tancaComEsJuga);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#com-es-juga').hidden) tancaComEsJuga(); });
+const btAjuda = $('#ajuda');
+btAjuda.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9a3 3 0 1 1 4.2 2.7c-.9.4-1.4 1.1-1.4 2v.8"/><circle cx="12" cy="18" r=".6" fill="currentColor"/></svg>';
+btAjuda.setAttribute('aria-label', T.comEsJuga.titol); btAjuda.title = T.comEsJuga.titol;
+btAjuda.addEventListener('click', () => { if (S.fase !== 'joc') obreComEsJuga(); });
+
+/* ---------- Mòbil apaïsat ---------- */
+// En un mòbil vertical, les dianes serien massa petites: la missió espera que es giri el mòbil.
+// Si es gira enmig d'una partida, un avís tapa la bomba i el rellotge continua.
+const vertical = matchMedia('(orientation: portrait) and (max-width: 600px)');
+let esperaGir = null;
+$('#gira-mobil-titol').textContent = T.mobil.gira;
+$('#gira-mobil-durant').textContent = T.mobil.durant;
+$('#gira-mobil-abans').textContent = T.mobil.abans;
+$('#gira-mobil-torna').textContent = T.mobil.torna;
+function vols(nivell) {
+  apaisa();
+  if (!vertical.matches) { comenca(nivell); return; }
+  esperaGir = nivell; document.body.dataset.esperaGir = 'true';
+}
+const deixaEsperar = () => { esperaGir = null; document.body.dataset.esperaGir = 'false'; };
+vertical.addEventListener('change', () => {
+  if (vertical.matches || !esperaGir) return;
+  const n = esperaGir; deixaEsperar(); comenca(n);
+});
+$('#gira-mobil-torna').addEventListener('click', deixaEsperar);
+// Amb l'app instal·lada o a pantalla completa, s'intenta deixar el mòbil apaïsat (només ho fan alguns navegadors).
+function apaisa() {
+  const o = screen.orientation;
+  if (o && o.lock && (document.fullscreenElement || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches)) o.lock('landscape').catch(() => {});
+}
 
 /* ---------- Girar la bomba ---------- */
 // Les dianes de la cara amagada, i totes mentre gira, no reben res: s'aturen abans d'arribar al mòdul.
@@ -562,6 +673,20 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   gira(e.key === 'ArrowLeft' ? -1 : 1);
 });
+// Al mòbil, lliscar el dit en horitzontal fora dels mòduls també gira la bomba.
+let lliscada = null;
+$('#dianes').addEventListener('pointerdown', (e) => {
+  lliscada = e.pointerType !== 'mouse' && !e.target.closest('.diana') ? { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId } : null;
+});
+$('#dianes').addEventListener('pointerup', (e) => {
+  const l = lliscada; lliscada = null;
+  if (!l || l.id !== e.pointerId) return;
+  const dx = e.clientX - l.x; const dy = e.clientY - l.y;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy) && performance.now() - l.t < 800) gira(dx < 0 ? 1 : -1);
+});
+$('#dianes').addEventListener('pointercancel', () => { lliscada = null; });
+// Un toc llarg no ha d'obrir el menú del sistema (el botó «mantén» es prem una estona).
+$('#dianes').addEventListener('contextmenu', (e) => e.preventDefault());
 
 /* ---------- Rellotge ---------- */
 let tics = 0;

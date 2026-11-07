@@ -3,7 +3,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
-const { servidor, CAPTURES, proves, quieta, veu, llegeix, captura, fotogrames, R, CODIS_PROVA, rellotge, ARGS, espera } = require('./ajuda.js');
+const { servidor, CAPTURES, proves, quieta, veu, llegeix, captura, fotogrames, R, CODIS_PROVA, rellotge, saltaIntro, ARGS, espera } = require('./ajuda.js');
 const { creaGoogle } = require('./fals-google.js');
 
 const GOOGLE = 'https://script.google.com/macros/s/PROVA/exec';
@@ -19,8 +19,8 @@ const CLAU = 'clau-de-prova';
   const errs = [];
   // Cada context és un ordinador d'aula: el seu navegador, connectat al «full» de mentida.
   async function ordinador({ remot = true, ms = 2000, reduit = false } = {}) {
-    const ctx = await nav.newContext({ viewport: CAPTURES ? { width: 1366, height: 768 } : { width: 960, height: 540 }, reducedMotion: reduit ? 'reduce' : 'no-preference', acceptDownloads: true });
-    await ctx.addInitScript(rellotge(ms));
+    const ctx = await nav.newContext({ viewport: CAPTURES ? { width: 1366, height: 768 } : { width: 960, height: 540 }, reducedMotion: reduit ? 'reduce' : 'no-preference', acceptDownloads: true, serviceWorkers: 'block' });
+    await ctx.addInitScript(rellotge(ms) + saltaIntro);
     if (remot) {
       await ctx.route('**/comu/config.js', (rt) => rt.fulfill({ contentType: 'text/javascript', body: `window.BOOMBERA_CONFIG = { servidor: '${GOOGLE}' };` }));
       await ctx.route(`${GOOGLE}*`, (rt) => {

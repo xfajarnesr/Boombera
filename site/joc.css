@@ -191,3 +191,115 @@ body:not([data-panell="entra"]):not([data-panell="carregant"]) #nota .lema { mar
 .nivell .bloc { flex: 1; align-self: stretch; justify-content: center; }
 .nivell .bloc .cadenat { width: 22px; height: 22px; }
 .seccio[data-oberta="false"] h3 .compte { color: #8a6b66; font-size: 13px; }
+
+/* ---------- Portada ---------- */
+/* La bomba es queda al fons, més lluny i a la penombra. En sortir de la portada, la càmera s'hi apropa. */
+#escena { transition: transform .9s cubic-bezier(.2, .7, .2, 1), filter .9s; }
+body[data-panell="portada"] #escena { transform: scale(.84); filter: brightness(.34) saturate(.7); }
+body[data-panell="portada"] #controls { z-index: 10; }
+#portada {
+  position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: clamp(8px, 2.2vh, 18px); padding: 24px 16px; text-align: center;
+  background: radial-gradient(ellipse 70% 60% at 50% 52%, #05050600 0%, #050506b0 62%, #050506 100%);
+}
+#portada[hidden] { display: none; }
+.logo { margin: 0; display: flex; align-items: center; justify-content: center; gap: .04em; font: 400 clamp(46px, 11vw, 124px)/1 var(--estargit); color: #eeece4; letter-spacing: .01em; }
+.logo .logo-visor { height: 1.02em; width: auto; margin: -.22em -.3em 0 .02em; overflow: visible; }
+#portada .lema { margin: 0; font: 700 clamp(18px, 3.2vw, 30px)/1 var(--titols); letter-spacing: .14em; text-transform: uppercase; color: #ff3b2a; cursor: default; user-select: none; -webkit-user-select: none; }
+.portada-botons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: clamp(6px, 2vh, 18px); }
+.portada-botons button {
+  min-width: 190px; min-height: 52px; padding: 10px 26px; font: 700 clamp(20px, 2.6vw, 26px)/1 var(--titols); text-transform: uppercase; letter-spacing: .06em;
+  background: #0c0d0ee6; color: #eeece4; border: 1px solid #8a8d8b; cursor: pointer;
+}
+.portada-botons .principal { background: #ff2a14; border-color: #ff2a14; color: #fff; }
+.portada-botons button:hover, .portada-botons button:focus-visible { border-color: #fff; color: #fff; }
+.portada-botons .principal:hover, .portada-botons .principal:focus-visible { background: #ff4a33; }
+#portada-equip { margin: 0; font-size: 16px; color: #cfd2cc; }
+#portada-equip span { font: 700 13px var(--titols); text-transform: uppercase; letter-spacing: .06em; color: #9ea29c; }
+#portada-equip b { font: 700 19px var(--titols); color: #fff; }
+#portada-equip i { font-style: normal; color: #ffd796; }
+#portada-manual { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px; color: #cfd2cc; font-size: 16px; text-decoration: underline; text-underline-offset: 3px; }
+#portada-manual:hover, #portada-manual:focus-visible { color: #fff; }
+#portada-manual svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Com es juga ---------- */
+#com-es-juga { position: absolute; inset: 0; z-index: 12; display: grid; place-items: center; padding: 16px; background: #000000b8; }
+#com-es-juga[hidden] { display: none; }
+.cej-capsa { width: min(520px, 100%); max-height: calc(100% - 8px); overflow-y: auto; padding: 22px 26px 20px; background: #0c0d0ef7; border: 1px solid #5c5f5f; border-top: 4px solid #ff2a14; box-shadow: 0 30px 80px #000; }
+.cej-etiqueta { margin: 0 0 6px; font: 700 14px var(--titols); text-transform: uppercase; letter-spacing: .08em; color: #9ea29c; }
+#cej-dibuix svg { display: block; width: 100%; max-height: 120px; margin: 0 0 8px; }
+#cej-dibuix * { fill: none; stroke: #cfd2cc; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+#cej-dibuix .d-pantalla { fill: #1b1d1f; stroke: #8a8d8b; }
+#cej-dibuix .d-vermell { fill: #ff2a14; stroke: none; }
+#cej-dibuix .d-apagat { fill: #2a2d2e; stroke: #5c5f5f; }
+#cej-dibuix .d-llibre { fill: #e8e6de; stroke: #e8e6de; }
+#cej-dibuix .d-llibre + .d-linia { stroke: #1b1d1f; }
+#cej-dibuix .d-mur { stroke: #5c5f5f; stroke-dasharray: 4 5; }
+#cej-dibuix .d-veu { stroke: #ff3b2a; }
+#cej-dibuix .d-cap, #cej-dibuix .d-cos { stroke: #e8e6de; }
+#cej-dibuix .d-nom { fill: #cfd2cc; stroke: none; font: 700 13px var(--titols); text-anchor: middle; text-transform: uppercase; letter-spacing: .06em; }
+#cej-titol { margin: 0 0 6px; font: 700 30px/1.05 var(--titols); text-transform: uppercase; color: #fff; }
+#cej-text { margin: 0 0 16px; font-size: 18px; line-height: 1.45; }
+#cej-text b { color: #ff6a4a; }
+.cej-peu { display: flex; align-items: center; gap: 12px; }
+.cej-punts { display: flex; gap: 7px; margin-right: auto; }
+.cej-punts i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid #8a8d8b; }
+.cej-punts i[data-actiu="true"] { background: #ff2a14; border-color: #ff2a14; }
+#cej-salta { background: none; border: 0; color: #cfd2cc; font: 16px var(--text); text-decoration: underline; cursor: pointer; padding: 10px 6px; }
+#cej-seguent { min-height: 46px; background: #ff2a14; border: 1px solid #ff2a14; color: #fff; font: 700 20px var(--titols); text-transform: uppercase; letter-spacing: .04em; padding: 8px 20px; cursor: pointer; }
+#cej-seguent:hover, #cej-seguent:focus-visible { background: #ff4a33; }
+body[data-fase="joc"] #ajuda { display: none; }
+
+/* ---------- Mòbil ---------- */
+/* Durant la missió, el dit no fa desplaçar ni ampliar la pàgina, i un toc llarg no obre el menú del sistema. */
+body[data-fase="joc"] #dianes { touch-action: none; }
+.diana { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+#gira-mobil {
+  position: absolute; inset: 0; z-index: 14; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 24px; text-align: center; background: #050506f2;
+}
+#gira-mobil svg { width: 84px; height: 84px; fill: none; stroke: #ff3b2a; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; animation: giramobil 1.8s ease-in-out infinite; }
+@keyframes giramobil { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+#gira-mobil h2 { margin: 0; font: 700 30px var(--titols); text-transform: uppercase; color: #fff; }
+#gira-mobil p { margin: 0; max-width: 30ch; font-size: 18px; line-height: 1.4; color: #cfd2cc; }
+#gira-mobil button { margin-top: 6px; min-height: 46px; padding: 8px 22px; background: #1b1d1f; border: 1px solid #8a8d8b; color: #fff; font: 700 18px var(--titols); text-transform: uppercase; cursor: pointer; }
+#gira-mobil .durant { display: none; }
+body[data-espera-gir="true"] #gira-mobil { display: flex; }
+@media (orientation: portrait) and (max-width: 600px) {
+  body[data-fase="joc"] #gira-mobil { display: flex; }
+  body[data-fase="joc"] #gira-mobil .abans { display: none; }
+  body[data-fase="joc"] #gira-mobil .durant { display: block; }
+}
+@media (prefers-reduced-motion: reduce) { #gira-mobil svg { animation: none; } #escena { transition: none; } }
+/* Pantalles baixes (un mòbil apaïsat): la nota ocupa gairebé tota l'alçada i es pot desplaçar. */
+@media (max-height: 480px) {
+  #nota { padding: 14px 18px 16px; max-height: calc(100% - 12px); }
+  #nota h2 { font-size: 34px; }
+  body:not([data-panell="entra"]):not([data-panell="carregant"]) #nota h2 { font-size: 30px; }
+  #nota p { font-size: 16px; margin-bottom: 10px; }
+  #portada { gap: 6px; padding: 10px 16px; }
+  .logo { font-size: clamp(40px, 15vh, 80px); }
+  .portada-botons { margin-top: 4px; }
+  .portada-botons button { min-height: 46px; min-width: 170px; padding: 8px 20px; }
+  .seccio { grid-template-columns: 120px repeat(4, 1fr); }
+  .nivell { padding: 5px 7px; }
+  .nivell strong { font-size: 19px; }
+  .cej-capsa { padding: 14px 18px; }
+  #cej-dibuix svg { max-height: 70px; }
+  #cej-titol { font-size: 24px; }
+  #cej-text { font-size: 16px; margin-bottom: 10px; }
+}
+/* Amb el dit, cada diana respon 6 px més enllà de la vora: les fletxes i les palanques al mòbil són petites. */
+@media (pointer: coarse) { .diana::before { content: ""; position: absolute; inset: -6px; border-radius: inherit; } }
+/* Mòbils amb osca: res important sota l'osca ni sota les vores arrodonides (viewport-fit=cover). */
+#controls { top: max(8px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); }
+#gira { right: max(clamp(8px, 1.6vw, 28px), env(safe-area-inset-right)); }
+#portada { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+/* Amb el «Com es juga» obert, la portada no es veu a través. */
+body[data-ajuda="true"] #portada { visibility: hidden; }
+/* Mòbil apaïsat: la nota deixa lloc a les icones de dalt, i a les missions no hi cap el títol. */
+@media (max-height: 480px) {
+  body[data-fase="inici"] #nota, body[data-fase="salvada"] #nota, body[data-fase="petada"] #nota { width: min(760px, calc(100% - 140px)); }
+  body[data-fase="inici"]:not([data-panell="entra"]) #nota-titol, body[data-fase="inici"]:not([data-panell="entra"]) #nota .lema { display: none; }
+}
+@media (max-height: 480px) { #controls { flex-direction: column; } }

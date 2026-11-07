@@ -2,7 +2,7 @@
 
 *Parla o peta.*
 
-Joc d'aula per parelles, en català. Qui desactiva veu la bomba a la pantalla, qui fa d'expert té el manual imprès, i només poden parlar.
+Joc d'aula per equips, en català. L'Agent veu la bomba a la pantalla, la Guia té el manual (imprès o en una altra pantalla), i només poden parlar. Es pot instal·lar com a app al mòbil o a l'ordinador i funciona sense connexió.
 
 - **Joc:** https://xfajarnesr.github.io/Curtcircuit/
 - **Manual:** https://xfajarnesr.github.io/Curtcircuit/manual/
@@ -14,10 +14,13 @@ Joc d'aula per parelles, en català. Qui desactiva veu la bomba a la pantalla, q
 
 - `site/comu/regles.js`: l'única font de les regles. La fan servir el joc, el manual i les proves.
 - `site/moduls/<mòdul>/`: cada mòdul té el seu `3d.js`, el seu `joc.js` i el seu `manual.js`. `registre.js` els aplega.
-- `site/index.html`, `joc.js` i `joc.css`: la partida.
+- `site/index.html`, `joc.js` i `joc.css`: la portada, el «Com es juga», els panells i la partida.
+- `site/comu/textos.js`: els textos de la portada, del «Com es juga» i dels avisos del mòbil, un bloc per idioma.
+- `site/comu/logo.js`: el logo (el «00» del visor amb la metxa). D'aquí surten la portada i les icones (`npm run icones`, a `site/icones/`).
+- `site/app.js`, `site/manifest.webmanifest` i `site/sw.js`: l'app instal·lable. `sw.js` el fa `npm run app` i guarda el joc per jugar sense connexió (no el manual ni el tauler).
 - `site/motor/`: l'escena 3D, les peces comunes dels mòduls i el so, generat al navegador.
 - `site/vendor/`: la biblioteca Three.js.
-- `site/manual/`: el manual imprimible. El joc no hi enllaça.
+- `site/manual/`: el manual imprimible. El joc només hi enllaça des de la portada («Manual per a la Guia»).
 - `site/dades/`: equips, partides i progrés. `nucli.js` és la lògica de les dades (la fan servir el joc, el full de càlcul i les proves) i `dades.js`, la part del navegador, amb la cua de partides per enviar.
 - `site/comu/config.js`: l'adreça de l'Apps Script. Si és buida, les dades es desen només al navegador.
 - `site/comu/codis.js`: les empremtes dels codis del professorat, fetes amb `scripts/codis.js`. Els codis no són al repositori.

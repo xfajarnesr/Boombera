@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
 const R = require('../site/comu/regles.js');
-const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, llegeixCarcassa, llegeix, idx, total, fusibles, fet, captura, fotogrames, nivell, pausaCaptura, SITE, rellotge, modeDemo, ARGS } = require('./ajuda.js');
+const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, llegeixCarcassa, llegeix, idx, total, fusibles, fet, captura, fotogrames, nivell, pausaCaptura, SITE, rellotge, modeDemo, saltaIntro, ARGS } = require('./ajuda.js');
 
 (async () => {
   await new Promise((ok) => servidor.listen(0, ok));
@@ -11,11 +11,11 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   const url = `${base}/index.html`;
   const urlManual = `${base}/manual/index.html`;
   const nav = await chromium.launch({ args: ARGS });
-  const ctx = await nav.newContext({ viewport: CAPTURES ? { width: 1366, height: 768 } : { width: 960, height: 540 } });
+  const ctx = await nav.newContext({ viewport: CAPTURES ? { width: 1366, height: 768 } : { width: 960, height: 540 }, serviceWorkers: 'block' });
   const p = await ctx.newPage();
   // A les proves no hi ha targeta gràfica: es dibuixa poc perquè el rellotge no vagi carregat,
   // i es pot saltar temps per comprovar el final de la partida.
-  await ctx.addInitScript(rellotge(2000) + modeDemo);
+  await ctx.addInitScript(rellotge(2000) + modeDemo + saltaIntro);
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
@@ -32,9 +32,9 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
 
   // Cada missió porta els mòduls, el temps i els errors que diu. Una segona pestanya amb «moviment reduït»
   // fa que la càmera no entri volant i que la nota surti de seguida després d'acabar.
-  const ctxR = await nav.newContext({ viewport: { width: 960, height: 540 }, reducedMotion: 'reduce' });
+  const ctxR = await nav.newContext({ viewport: { width: 960, height: 540 }, reducedMotion: 'reduce', serviceWorkers: 'block' });
   // Aquí només es llegeixen dades: es dibuixa molt poc perquè cada missió vagi de pressa a les màquines lentes.
-  await ctxR.addInitScript(rellotge(30000) + modeDemo);
+  await ctxR.addInitScript(rellotge(30000) + modeDemo + saltaIntro);
   // En aquesta pestanya els fotogrames són molt espaiats: les esperes comproven l'estat cada 100 ms, no a cada fotograma.
   const POLL = { polling: 100 };
   // Els clics de Playwright esperen que l'element estigui quiet durant dos fotogrames: aquí es prem directament.
@@ -485,8 +485,9 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   assert(!(await p.textContent('body')).includes('Curtcircuit'), 'el nom antic no surt al joc');
   console.log("Boombera: l'altaveu canvia d'estat i hi ha el botó de pantalla completa.");
 
-  // El joc no enllaça el manual.
-  assert.strictEqual(await p.locator('a[href*="manual"]').count(), 0, 'el joc no ha d\'enllaçar el manual');
+  // El joc només enllaça el manual des de la portada (per a la Guia): fora de la portada no se'n veu cap enllaç.
+  assert.deepStrictEqual(await p.evaluate(() => [...document.querySelectorAll('a[href*="manual"]')].map((a) => a.closest('#portada') ? a.id : 'fora')), ['portada-manual'], "el manual només s'enllaça des de la portada");
+  assert.strictEqual(await p.locator('a[href*="manual"]:visible').count(), 0, 'durant la partida no es veu cap enllaç al manual');
 
   // El manual surt de les dades, no porta la llista de primers i cap en sis pàgines A4.
   await p.setViewportSize({ width: 1000, height: 1200 });
