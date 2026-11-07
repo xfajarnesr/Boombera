@@ -24,6 +24,8 @@
   <div id="flaix" aria-hidden="true"></div>
   <div id="sutge" aria-hidden="true"></div>
   <div id="esquerdes" aria-hidden="true"></div>
+  <div id="vinyeta" aria-hidden="true"></div>
+  <p id="segell" aria-hidden="true"></p>
   <div id="dianes"></div>
 
   <div class="dades-ocultes">
@@ -39,9 +41,13 @@
     <p id="missio"></p>
   </div>
 
-  <button id="gira" type="button" aria-label="Gira la bomba" title="Gira la bomba"></button>
+  <div id="barra-gir">
+    <button id="allunya" type="button"></button>
+    <button id="gira" type="button"></button>
+  </div>
 
   <div id="controls">
+    <button id="musica" type="button" aria-pressed="true"></button>
     <button id="so" type="button" aria-pressed="true"></button>
     <button id="pantalla" type="button"></button>
     <button id="ajuda" type="button"></button>
@@ -145,6 +151,12 @@
       <div class="accions"><button type="button" id="codi-tanca">Tanca</button><button type="submit" class="principal">D'acord</button></div>
       <p class="avis" id="codi-avis" aria-live="polite"></p>
     </form>
+  </section>
+  <section id="diag" hidden aria-labelledby="diag-titol">
+    <h2 id="diag-titol"></h2>
+    <p id="diag-dades" aria-live="polite"></p>
+    <p id="diag-tria"></p>
+    <button type="button" id="diag-tanca" aria-label="Tanca">×</button>
   </section>
   <p id="sense3d" hidden>Aquest ordinador no pot mostrar gràfics 3D. Prova-ho amb un altre navegador o activa l'acceleració gràfica.</p>
 </main>

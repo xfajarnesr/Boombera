@@ -71,6 +71,14 @@ const midaPng = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16
   assert.strictEqual(await p.getAttribute('#portada-manual', 'target'), '_blank');
   assert((await p.textContent('#portada-manual')).includes('Manual per a la Guia'));
   assert((await p.locator('#portada-manual').boundingBox()).height >= 44, 'el manual és un botó gran');
+  // «Missions» és el botó principal: més gran que el del manual i amb la lletra més grossa.
+  const [bm, bman] = [await p.locator('#portada-missions').boundingBox(), await p.locator('#portada-manual').boundingBox()];
+  assert(bm.width * bm.height > 1.5 * bman.width * bman.height, 'Missions té més pes que el manual');
+  const lletra = (sel) => p.evaluate((x) => parseFloat(getComputedStyle(document.querySelector(x)).fontSize), sel);
+  assert(await lletra('#portada-missions') > await lletra('#portada-manual b'), 'Missions té la lletra més grossa');
+  // L'arrencada de la portada s'acaba sola (o amb una tecla) i deixa tot a la vista.
+  await p.waitForFunction(() => document.body.dataset.arrencada === 'feta', null, { timeout: 10000 });
+  assert.strictEqual(await p.evaluate(() => getComputedStyle(document.querySelector('.portada-botons')).opacity), '1');
   const respostaManual = await p.request.get(`${base}/manual/`);
   assert.strictEqual(respostaManual.status(), 200, 'la pàgina del manual existeix');
   assert.strictEqual(await p.locator('#gira').isVisible(), false);
@@ -136,6 +144,18 @@ const midaPng = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16
   await p.waitForFunction(() => document.body.dataset.fase === 'joc');
   assert.strictEqual(await visible(p, '#ajuda'), false);
   assert.strictEqual(await visible(p, '#gira-mobil'), false, "en un PC no surt l'avís de girar el mòbil");
+  // En un PC no hi ha zones per ampliar (només amb el dit).
+  assert.strictEqual(await p.locator('.zona').count(), 0);
+  // L'indicador ocult de rendiment: Ctrl + Alt + D. Es pot forçar un graó de qualitat i tornar a l'automàtica.
+  await p.keyboard.press('Control+Alt+d');
+  await p.waitForFunction(() => !document.querySelector('#diag').hidden && document.querySelector('#diag-dades').textContent.includes('qualitat'));
+  await p.locator('#diag-tria button', { hasText: 'mínima' }).click();
+  await p.waitForFunction(() => document.querySelector('#diag-dades').textContent.includes('mínima') && document.querySelector('#diag-dades').textContent.includes('forçada'));
+  await p.locator('#diag-tria button', { hasText: 'automàtica' }).click();
+  await p.waitForFunction(() => document.querySelector('#diag-dades').textContent.includes('(automàtica)'));
+  await p.keyboard.press('Control+Alt+d');
+  await p.waitForFunction(() => document.querySelector('#diag').hidden);
+  console.log("Rendiment: Ctrl + Alt + D mostra l'indicador, i es pot forçar la qualitat.");
   await ctx.close();
   console.log("Portada: logo, lema, Missions i el manual (un botó gran, en una altra pestanya), sense missió lliure. El «Com es juga» surt la primera vegada i amb «?», i es pot tornar a la portada.");
 
@@ -181,6 +201,46 @@ const midaPng = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16
   await llisca(-160, 10);
   await m.waitForFunction((c) => document.body.dataset.girant === 'false' && Number(document.body.dataset.cara) === 1 - c, cara0, { timeout: 30000 });
   await quieta(m);
+  // Ampliar per zones: un toc en un mòdul (fora dels seus botons) hi apropa la càmera, i les dianes s'hi fan grans.
+  const zona = await m.evaluate(() => {
+    // Un punt del mòdul que no sigui cap diana.
+    for (const z of [...document.querySelectorAll('.zona[data-amagada="false"]')].filter((x) => !x.dataset.zona.startsWith('cap-'))) {
+      const r = z.getBoundingClientRect();
+      for (let i = 1; i < 10; i++) for (let j = 1; j < 10; j++) {
+        const x = r.left + r.width * i / 10; const y = r.top + r.height * j / 10;
+        if (document.elementFromPoint(x, y) === z) return { nom: z.dataset.zona, x, y };
+      }
+    }
+    return null;
+  });
+  assert(zona, 'hi ha un mòdul amb lloc per tocar fora dels botons');
+  const midaDianes = () => m.evaluate((nom) => Math.max(...[...document.querySelectorAll(`[data-instancia="${nom}"] .diana`)].map((d) => d.getBoundingClientRect().width)), zona.nom);
+  const abans = await midaDianes();
+  await m.touchscreen.tap(zona.x, zona.y);
+  await m.waitForFunction((nom) => document.body.dataset.ampliada === nom, zona.nom);
+  await quieta(m);
+  const ampliada = await midaDianes();
+  assert(ampliada > abans * 1.8, `ampliat, el mòdul es veu més gran: ${abans.toFixed(0)} → ${ampliada.toFixed(0)} px`);
+  assert.strictEqual(await visible(m, '#allunya'), true, 'surt la lupa per tornar');
+  await captura(m, 'app-mobil-ampliat');
+  await m.locator('#allunya').tap();
+  await m.waitForFunction(() => !document.body.dataset.ampliada);
+  await quieta(m);
+  assert(Math.abs((await midaDianes()) - abans) < 2, 'la lupa torna a veure tota la bomba');
+  // També s'amplia la capçalera; girar la bomba torna enrere.
+  const cap = await m.evaluate(() => {
+    const z = [...document.querySelectorAll('.zona[data-amagada="false"]')].find((x) => x.dataset.zona.endsWith('-r')); const r = z.getBoundingClientRect();
+    for (let i = 1; i < 10; i++) for (let j = 1; j < 6; j++) { const x = r.left + r.width * i / 10; const y = r.top + r.height * j / 6; if (document.elementFromPoint(x, y) === z) return { nom: z.dataset.zona, x, y }; }
+    return null;
+  });
+  await m.touchscreen.tap(cap.x, cap.y);
+  await m.waitForFunction((nom) => document.body.dataset.ampliada === nom, cap.nom);
+  await quieta(m);
+  const cara1 = await m.evaluate(() => Number(document.body.dataset.cara));
+  await m.locator('#gira').tap();
+  await m.waitForFunction((c) => !document.body.dataset.ampliada && document.body.dataset.girant === 'false' && Number(document.body.dataset.cara) === 1 - c, cara1, { timeout: 30000 });
+  await quieta(m);
+  console.log(`Mòbil: un toc en un mòdul l'amplia (dianes de ${abans.toFixed(0)} a ${ampliada.toFixed(0)} px), la lupa i girar la bomba ho desfan.`);
   // Amb el mòbil vertical enmig de la partida, un avís tapa la bomba i el rellotge continua.
   await m.setViewportSize({ width: 390, height: 844 });
   await m.waitForFunction(() => getComputedStyle(document.querySelector('#gira-mobil')).display !== 'none');

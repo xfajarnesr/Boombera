@@ -3,11 +3,17 @@ import { creaEscena } from './motor/escena.js';
 import { creaSo } from './motor/so.js';
 import { MODULS } from './moduls/registre.js';
 import { creaDades, quinCodi, modeDesat, desaMode } from './dades/dades.js';
+import { W, H } from './motor/peces.js';
 
 const R = window.Curtcircuit;
 const T = window.BoomberaTextos.T;
 const $ = (s) => document.querySelector(s);
 const senseMoviment = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Amb el dit (mòbil o tauleta), cada mòdul i cada part de la capçalera es pot ampliar amb un toc.
+const tactil = matchMedia('(pointer: coarse)').matches;
+// Armat abans del compte enrere: el rellotge no compta fins que s'acaba.
+const ARMAT_MS = senseMoviment ? 500 : 1200;
+const nomDe = (inst) => inst.replace(/-2$/, '');
 const so = creaSo();
 const dades = creaDades();
 
@@ -22,6 +28,8 @@ async function arrenca() {
   try {
     esc = creaEscena($('#escena'), senseMoviment);
     esc.enCanviCara(posaCara);
+    // Les proves (que porten un rellotge de mentida) poden llegir l'escena.
+    if (window.__ms !== undefined) window.__esc = esc;
   } catch (e) {
     $('#sense3d').hidden = false;
     $('#nota').hidden = true;
@@ -40,13 +48,14 @@ function novaBomba(nivell) {
   // (la carcassa és la mateixa), i el mòdul ho rep com si fos l'única bomba.
   S.inst = R.instancies(nivell.moduls).map(({ id, nom }) => ({ id, nom, b: id === nom ? S.b : { ...S.b, [nom]: R.generaModul(nom, Math.random, S.b) } }));
   S.ids = S.inst.map((x) => x.id);
-  Object.assign(S, { errors: 0, fets: new Set(), controls: [], ultim: null, quiet: nivell.segons * 1000 });
+  Object.assign(S, { errors: 0, fets: new Set(), controls: [], ultim: null, quiet: nivell.segons * 1000, tError: 0, det: { errors: {}, temps: {}, seq: [] } });
   esc.construeix(S.b, R.repartimentEspais(S.ids), R.VERSIO, { instancies: Object.fromEntries(S.inst.map((x) => [x.id, x])), errors: nivell.errors });
   premut = false;
   posaCara(0, false);
   $('#dianes').innerHTML = '';
   $('#dades-moduls').innerHTML = '';
   S.controls = S.inst.map((x) => MODULS[x.nom].creaJoc(contextDe(x)));
+  if (tactil) posaZones();
   pintaDades();
   esc.posaTemps(format(totalSegons()), false);
   esc.posaErrors(0);
@@ -67,7 +76,7 @@ function contextDe({ id: inst, nom, b }) {
     actiu: () => S.fase === 'joc' && !S.fets.has(inst),
     errors: () => S.errors,
     segons: totalSegons,
-    error,
+    error: () => error(inst),
     resolt: () => modulFet(inst),
     diana(el, x, y, w, h) { if (el.id) el.id += sufix; capsa.appendChild(el); esc.diana(el, grup, x, y, w, h); },
     dada(id, text) {
@@ -122,33 +131,63 @@ function pintaFets() {
 }
 
 /* ---------- Partida ---------- */
+// Primer s'arma la bomba (els mòduls entren al seu lloc i es comproven els llums), i després comença el compte enrere.
 function comenca(nivell) {
   novaBomba(nivell);
-  S.finalMs = performance.now() + nivell.segons * 1000;
-  S.fase = 'joc';
-  document.body.dataset.fase = 'joc';
+  S.fase = 'armant'; S.armaFi = performance.now() + ARMAT_MS;
+  document.body.dataset.fase = 'armant';
   $('#nota').hidden = true;
   $('#esquerdes').innerHTML = '';
+  esc.posaEstat('armant');
+  esc.posaTemps('-:--', false);
+  esc.arma(ARMAT_MS);
+  so.armat(nivell.errors);
+}
+function enJoc() {
+  S.t0 = performance.now();
+  S.finalMs = S.t0 + S.nivell.segons * 1000;
+  S.fase = 'joc';
+  document.body.dataset.fase = 'joc';
   esc.posaEstat('joc');
+  esc.posaTemps(format(totalSegons()), false);
   so.arrenca();
   S.controls.forEach((c) => c.arrenca && c.arrenca());
 }
-function error() {
+const segonsDeJoc = () => Math.max(0, Math.round((performance.now() - S.t0) / 1000));
+function error(inst) {
   S.errors += 1; S.finalMs -= R.PARTIDA.penalitzacio * 1000;
+  S.tError = performance.now();
+  const nom = nomDe(inst);
+  S.det.errors[nom] = (S.det.errors[nom] || 0) + 1;
+  S.det.seq.push(`error ${inst} ${format(segonsDeJoc())}`);
   S.ultim = totalSegons(); pintaTemps(); esc.posaTemps(format(S.ultim), S.ultim <= 30);
   esc.posaErrors(S.errors); pintaErrors();
-  so.error();
+  // Greu: el que deixa l'últim marge (o el que fa petar). Amb marge, l'avís és més suau.
+  const queden = S.nivell.errors - S.errors;
+  const greu = queden <= 1;
+  so.error(greu);
+  esc.avisaError(inst, S.errors, greu);
+  document.body.style.setProperty('--cop', greu ? '1' : '.5');
   document.body.classList.remove('copet'); void document.body.offsetWidth; document.body.classList.add('copet');
   if (S.errors >= S.nivell.errors) acaba(false, S.nivell.errors === 1 ? 'Heu fet un error.' : `Heu fet ${S.nivell.errors} errors.`);
   else if (restantMs() <= 0) acaba(false, 'Els errors us han deixat sense temps.');
 }
-function modulFet(nom) {
-  S.fets.add(nom);
+function modulFet(inst) {
+  S.fets.add(inst);
+  const nom = nomDe(inst);
+  S.det.temps[nom] = Math.max(S.det.temps[nom] || 0, segonsDeJoc());
+  S.det.seq.push(`fet ${inst} ${format(segonsDeJoc())}`);
   so.modul();
-  esc.moduls[nom].userData.marcaFet();
+  esc.moduls[inst].userData.marcaFet();
+  esc.celebra(inst);
   pintaFets();
   if (S.ids.every((m) => S.fets.has(m))) acaba(true);
 }
+// Els mòduls de la bomba sense cap error porten un 0 (i els que no hi són, res): així el full pot fer mitjanes.
+const detall = () => {
+  const errors = {}; S.inst.forEach((x) => { errors[x.nom] = S.det.errors[x.nom] || 0; });
+  return { errors, temps: S.det.temps, seq: S.det.seq.join(' · ') };
+};
 
 function esquerdes() {
   // Vidre trencat que es queda a la pantalla fins a la bomba següent.
@@ -184,6 +223,8 @@ function acaba(guanya, motiu = '') {
   const res = desaPartida(guanya, t);
   S.fase = 'fi';
   aturaModuls();
+  if (esc.ampliada) allunya();
+  so.ultim(false);
   document.body.dataset.fase = guanya ? 'salvada' : 'petada';
   $('#bomba').className = guanya ? 'salvada' : 'petada';
   $('#estat').textContent = guanya ? 'Bomba desactivada' : 'Bomba explotada';
@@ -196,13 +237,18 @@ function acaba(guanya, motiu = '') {
   pintaInici();
   mostra(S.nivell.lliure && panellInicial() === 'entra' ? 'lliure' : 'missions');
   if (guanya) {
+    // Desactivada: el visor es queda en verd, se sent el relé i surt el segell. La nota arriba just després.
     esc.salvada(); so.guanya();
-    $('#nota').hidden = false;
+    esc.posaTemps(format(t), false);
+    $('#segell').textContent = T.joc.desactivada;
+    setTimeout(() => { if (S.fase === 'fi') $('#nota').hidden = false; }, senseMoviment ? 200 : 1100);
   } else {
+    // Abans del cop, un silenci sec i el visor que parpelleja «0:00».
+    so.silenci();
     const o = esc.origenDe(S.ids.find((m) => !S.fets.has(m)) || S.ids[0]).clone(); o.z = 1;
-    esc.explota(o); so.explosio();
-    esquerdes();
-    setTimeout(() => { $('#nota').hidden = false; const b = document.querySelector('.nivell:not(:disabled)'); if (b) b.focus(); }, senseMoviment ? 300 : 3200);
+    if (!senseMoviment) { esc.posaTemps('0:00', true); setTimeout(() => esc.posaTemps(' :  ', true), 100); setTimeout(() => esc.posaTemps('0:00', true), 200); }
+    setTimeout(() => { esc.explota(o); so.explosio(); esquerdes(); }, 300);
+    setTimeout(() => { $('#nota').hidden = false; const b = document.querySelector('.nivell:not(:disabled)'); if (b) b.focus(); }, senseMoviment ? 600 : 3500);
   }
   document.querySelectorAll('.diana').forEach((d) => { d.disabled = true; });
 }
@@ -227,8 +273,7 @@ function mostra(panell) {
   $('#portada').hidden = !portada;
   Object.entries(PANELLS).forEach(([k, sel]) => { $(sel).hidden = k !== panell; });
   document.body.dataset.panell = panell;
-  if (portada) pintaPortada();
-  else if (deLaPortada && esc) esc.posaTemps(format(totalSegons()), false);
+  if (portada) { pintaPortada(); visorPortada(true); } else if (deLaPortada && esc) { visorPortada(false); esc.posaTemps(format(totalSegons()), false); }
   $('#equip-barra').hidden = !ambEquip() || panell === 'entra';
   const focus = { entra: '#entra form:not([hidden]) input', rols: '#rols-comenca', lliure: '#lliure input:not(:disabled)', codi: '#codi-text' }[panell];
   if (focus && !$('#nota').hidden && $(focus)) $(focus).focus();
@@ -414,14 +459,20 @@ function lliguesRols() {
 }
 
 // En acabar una missió, es desa (si hi ha equip) i es diu què canvia: missió superada, rècord, secció nova i qui fa què ara.
-function desaPartida(guanya, t) {
+// Les partides sense equip i les missions lliures també s'envien mentre config.js ho digui (registraTot), sense comptar per al progrés.
+// estat: «abandonada» quan es tanca la pestanya a mitja bomba.
+function desaPartida(guanya, t, estat) {
   const n = S.nivell;
-  if (n.lliure || S.mode === 'demo') return null;
+  if (S.mode === 'demo') return null;
+  if (n.lliure || !ambEquip()) {
+    if (dades.registraTot) dades.registraAltra({ missio: n.lliure ? 'lliure' : n.codi, moduls: S.ids, segons: n.segons, maxErrors: n.errors, guanyada: guanya, errors: S.errors, marge: guanya ? t : 0, versio: R.VERSIO, estat, detall: detall() });
+    if (n.lliure) return null;
+  }
   const obertesAbans = seccionsObertes();
   let text = '';
   if (ambEquip()) {
     const rols = S.rols || rolsPerDefecte(dades.equip);
-    const r = dades.registra({ missio: n.codi, guanyada: guanya, errors: S.errors, marge: guanya ? t : 0, agent: rols.agent, guia: rols.guia, versio: R.VERSIO });
+    const r = dades.registra({ missio: n.codi, guanyada: guanya, errors: S.errors, marge: guanya ? t : 0, agent: rols.agent, guia: rols.guia, versio: R.VERSIO, estat, detall: detall() });
     if (r.primera) text += ' Missió superada!';
     else if (r.record) text += ' Nou rècord!';
     const novaSec = seccionsObertes().filter((s) => !obertesAbans.includes(s));
@@ -429,7 +480,7 @@ function desaPartida(guanya, t) {
     const ara = rolsDespres(rols.agent, rols.guia);
     text += ` Ara canvieu: ${escapa(ara.agent)} a la bomba i ${escapa(ara.guia)} amb el manual.`;
     $('#nota-text').dataset.record = String(r.record); $('#nota-text').dataset.seccions = novaSec.join(' ');
-  } else if (S.convidat) {
+  } else if (S.convidat && estat !== 'abandonada') {
     if (guanya) S.convidat.add(n.codi);
     const novaSec = seccionsObertes().filter((s) => !obertesAbans.includes(s));
     novaSec.forEach((s) => { text += ` S'ha obert la secció ${s}: ${R.SECCIONS[s - 1].nom}.`; });
@@ -513,21 +564,29 @@ function obreLliure(obre) {
 }
 
 /* ---------- So ---------- */
-// Altaveu: amb ones si sona, ratllat si no.
+// Dues icones: la nota musical (música de tensió) i l'altaveu (sons dels botons). Ratllades i en vermell si no sonen.
 const ICONES = {
   so: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
   mut: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9l6 6M22 9l-6 6"/></svg>',
+  musica: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="17.5" cy="16" r="2.5" fill="currentColor"/></svg>',
+  senseMusica: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="17.5" cy="16" r="2.5" fill="currentColor"/><path d="M3 3l18 18"/></svg>',
   amplia: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>',
   redueix: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg>',
 };
-const btSo = $('#so');
+const btSo = $('#so'); const btMusica = $('#musica');
 const pintaSo = () => {
-  btSo.innerHTML = so.actiu ? ICONES.so : ICONES.mut;
-  btSo.setAttribute('aria-label', so.actiu ? 'Apaga el so' : 'Encén el so');
+  const ef = so.efectes; const mu = so.musica;
+  btSo.innerHTML = ef ? ICONES.so : ICONES.mut;
+  btSo.setAttribute('aria-label', ef ? T.joc.efectes.apaga : T.joc.efectes.encen);
   btSo.title = btSo.getAttribute('aria-label');
-  btSo.setAttribute('aria-pressed', String(so.actiu));
+  btSo.setAttribute('aria-pressed', String(ef));
+  btMusica.innerHTML = mu ? ICONES.musica : ICONES.senseMusica;
+  btMusica.setAttribute('aria-label', mu ? T.joc.musica.apaga : T.joc.musica.encen);
+  btMusica.title = btMusica.getAttribute('aria-label');
+  btMusica.setAttribute('aria-pressed', String(mu));
 };
-btSo.addEventListener('click', () => { so.commuta(); pintaSo(); });
+btSo.addEventListener('click', () => { so.commutaEfectes(); pintaSo(); });
+btMusica.addEventListener('click', () => { so.commutaMusica(); pintaSo(); });
 pintaSo();
 
 /* ---------- Pantalla completa ---------- */
@@ -552,6 +611,16 @@ pintaPantalla();
 const guarda = (magatzem, k, v) => { try { magatzem.setItem(k, v); } catch { /* navegador sense emmagatzematge */ } };
 const llegeix = (magatzem, k) => { try { return magatzem.getItem(k); } catch { return null; } };
 const portadaVista = () => llegeix(sessionStorage, 'boombera.portada') === '1';
+// A la portada, el «-:--» de la bomba del fons parpelleja a poc a poc.
+let parpelleig = null;
+function visorPortada(v) {
+  clearInterval(parpelleig); parpelleig = null;
+  if (!esc) return;
+  esc.portada(v);
+  if (!v) return;
+  let on = true;
+  parpelleig = setInterval(() => { on = !on; if (document.body.dataset.panell === 'portada') esc.posaTemps(on ? '--:--' : ' :  ', true); }, 1200);
+}
 function pintaPortada() {
   const e = ambEquip() ? dades.equip : null;
   const p = $('#portada-equip');
@@ -560,10 +629,25 @@ function pintaPortada() {
   p.innerHTML = [e ? `<span>${T.portada.equip}</span> <b>${escapa(e.nom)}</b>` : '', mode ? `<i>${mode}</i>` : ''].filter(Boolean).join(' · ');
   if (esc) esc.posaTemps('--:--', true);
 }
+// Arrencada de la portada (2,5 s, la primera vegada a cada pestanya): negre, el focus que parpelleja,
+// el visor del logo que s'encén segment a segment, la metxa, el lema i els botons. Qualsevol tecla o toc la salta.
+function arrencada() {
+  const cos = document.body;
+  if (senseMoviment) { cos.dataset.arrencada = 'feta'; return; }
+  cos.dataset.arrencada = 'en-marxa';
+  const salta = () => { cos.dataset.arrencada = 'feta'; ['pointerdown', 'keydown'].forEach((t) => removeEventListener(t, salta, true)); };
+  ['pointerdown', 'keydown'].forEach((t) => addEventListener(t, salta, true));
+  setTimeout(salta, 2600);
+}
 function lliguesPortada() {
   $('#portada-logo').innerHTML = `<span>B</span>${window.BoomberaLogo.visor()}<span>MBERA</span>`;
+  // Cada segment encès del visor del logo s'encén un rere l'altre.
+  document.querySelectorAll('#portada-logo .logo-visor polygon[fill="#ff2a14"]').forEach((pl, i) => { pl.classList.add('segment'); pl.style.setProperty('--i', i); });
+  const esp = document.querySelector('#portada-logo .logo-visor polygon[fill="#ffb02e"]');
+  if (esp) { esp.classList.add('espurna'); esp.nextElementSibling.classList.add('espurna'); }
+  if (document.body.dataset.panell === 'portada' || !portadaVista()) arrencada(); else document.body.dataset.arrencada = 'feta';
   $('#portada-lema').textContent = T.lema;
-  $('#portada-missions').textContent = T.portada.missions;
+  $('#portada-missions').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span>${T.portada.missions}</span>`;
   $('#portada-manual').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h6"/></svg><span><b>${T.portada.manual}</b><small>${T.portada.manualDesc}</small></span>`;
   $('#portada-manual').title = T.portada.manualTitol;
   // La missió lliure no surt a la portada: és a baix de tot de les missions.
@@ -657,15 +741,56 @@ const amagada = (d) => esc && (esc.girant || Number(d.dataset.cara) !== esc.cara
 ['pointerup', 'pointercancel', 'blur'].forEach((tipus) => window.addEventListener(tipus, () => { premut = false; }, true));
 window.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') premut = false; }, true);
 
+const fos = () => { if (senseMoviment) { document.body.classList.remove('fos'); void document.body.offsetWidth; document.body.classList.add('fos'); } };
 function gira(sentit) {
   if (S.fase !== 'joc' || premut || !esc) return;
+  // Si hi ha una zona ampliada, la càmera torna enrere mentre la bomba gira.
+  if (esc.ampliada) allunya();
   if (!esc.gira(sentit)) return;
   so.gir();
-  if (senseMoviment) { document.body.classList.remove('fos'); void document.body.offsetWidth; document.body.classList.add('fos'); }
+  fos();
 }
+// Barra a sota de la bomba: «Davant · Darrere», amb la cara que es veu marcada. Un toc fa mitja volta.
 const btGira = $('#gira');
-btGira.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="full-bomba" x="17" y="9" width="14" height="30" rx="2"/><path d="M12.5 30.5A13 6 0 0 1 9 24c0-3.3 6.7-6 15-6s15 2.7 15 6-6.7 6-15 6"/><path d="M28.5 26.2 24 30l4.6 3.6"/></svg><span class="punts" aria-hidden="true"><i></i><i></i></span>';
+const CARA = '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="2.5" width="14" height="15" rx="1.5"/><path d="M6 6.5h8"/></svg>';
+btGira.innerHTML = `<span class="cara" data-c="0">${CARA}${T.joc.davant}</span><span class="cara" data-c="1">${CARA}${T.joc.darrere}</span>`;
+btGira.setAttribute('aria-label', T.joc.gira); btGira.title = T.joc.gira;
 btGira.addEventListener('click', () => gira(1));
+
+/* ---------- Ampliar per zones (mòbil) ---------- */
+// Un toc en un mòdul (fora dels seus botons) o en una part de la capçalera hi apropa la càmera.
+// Un altre toc a la mateixa zona, el botó de la lupa o girar la bomba la tornen enrere.
+const btAllunya = $('#allunya');
+btAllunya.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M7.5 10.5h6"/></svg>';
+btAllunya.setAttribute('aria-label', T.joc.allunya); btAllunya.title = T.joc.allunya;
+function allunya() { if (!esc || !esc.ampliada) return; esc.allunya(); document.body.dataset.ampliada = ''; fos(); }
+btAllunya.addEventListener('click', allunya);
+function amplia(el) {
+  if (S.fase !== 'joc' || esc.girant) return;
+  if (esc.ampliada === el) { allunya(); return; }
+  esc.amplia(el); document.body.dataset.ampliada = el.dataset.zona; fos();
+}
+function posaZones() {
+  const capsa = document.createElement('div'); capsa.className = 'zones';
+  $('#dianes').prepend(capsa);
+  const nova = (nom, obj, x, y, w, h) => {
+    const z = document.createElement('div'); z.className = 'zona'; z.dataset.zona = nom; z.setAttribute('aria-hidden', 'true');
+    capsa.appendChild(z); esc.zona(z, obj, x, y, w, h);
+  };
+  S.ids.forEach((id) => nova(id, esc.moduls[id], 0, 0, W, H));
+  // La capçalera de cada cara, en tres trossos: les dues bandes de la carcassa i el rellotge.
+  esc.cares.forEach((c, i) => { nova(`cap-${i}-e`, c, -4.05, 3.15, 4.3, 1.8); nova(`cap-${i}-r`, c, 0, 3.12, 4.1, 1.4); nova(`cap-${i}-d`, c, 4.05, 3.15, 4.3, 1.8); });
+}
+let tocZona = null;
+$('#dianes').addEventListener('pointerdown', (e) => {
+  const z = e.target.closest && e.target.closest('.zona');
+  tocZona = z && e.pointerType !== 'mouse' ? { z, x: e.clientX, y: e.clientY, t: performance.now() } : null;
+});
+$('#dianes').addEventListener('pointerup', (e) => {
+  const t = tocZona; tocZona = null;
+  if (!t || Math.hypot(e.clientX - t.x, e.clientY - t.y) > 12 || performance.now() - t.t > 600) return;
+  amplia(t.z);
+});
 document.addEventListener('keydown', (e) => {
   if (e.repeat || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
   e.preventDefault();
@@ -689,14 +814,19 @@ $('#dianes').addEventListener('contextmenu', (e) => e.preventDefault());
 /* ---------- Rellotge ---------- */
 let tics = 0;
 setInterval(() => {
+  if (S.fase === 'armant' && performance.now() >= S.armaFi) enJoc();
   if (S.fase !== 'joc') return;
   // Comptador de passades del rellotge: les proves l'esperen per saber que el temps pintat ja és l'actual.
   $('#temps').dataset.tic = ++tics;
   const ms = restantMs();
   const i = 1 - Math.max(0, ms) / (S.nivell.segons * 1000);
-  // La tensió també puja amb els errors.
-  const tensio = Math.min(1, i + S.errors * 0.08);
-  esc.intensitat(tensio); so.intensitat(tensio);
+  // Un error fa pujar la tensió uns 4 s i després torna gairebé on era. Quan queda l'últim error, entra una capa nova.
+  const pic = S.tError ? 0.2 * Math.exp(-(performance.now() - S.tError) / 1300) : 0;
+  const ultim = S.nivell.errors > 1 && S.errors === S.nivell.errors - 1;
+  const tensio = Math.min(1, i + S.errors * 0.03 + pic + (ultim ? 0.12 : 0));
+  esc.intensitat(tensio); so.intensitat(tensio); so.ultim(ultim);
+  // Per a les proves: la tensió que sona i si queda l'últim error.
+  $('#temps').dataset.tensio = tensio.toFixed(3); $('#temps').dataset.ultim = ultim;
   const t = totalSegons();
   if (t !== S.ultim) {
     S.ultim = t;
@@ -706,5 +836,34 @@ setInterval(() => {
   }
   if (ms <= 0) { S.ultim = 0; acaba(false, "S'ha acabat el temps."); }
 }, 50);
+
+/* ---------- Partida abandonada ---------- */
+// Si es tanca la pestanya (o es recarrega) a mitja bomba, la partida es desa com a abandonada i s'intenta enviar al moment.
+addEventListener('pagehide', () => {
+  if (S.fase !== 'joc' && S.fase !== 'armant') return;
+  S.fase = 'fi';
+  desaPartida(false, 0, 'abandonada');
+  dades.enviaAra();
+});
+
+/* ---------- Rendiment (Ctrl + Alt + D) ---------- */
+// Un indicador ocult per provar-ho als PC d'aula: fotogrames, temps de fotograma, qualitat, crides de dibuix i targeta.
+let diag = null;
+function pintaDiag() {
+  const r = esc.rendiment(); const D = T.diag;
+  $('#diag-dades').innerHTML = `<b>${r.fps.toFixed(0)}</b> ${D.fps} · ${D.mediana} <b>${r.mediana.toFixed(0)} ms</b> · ${D.lent} <b>${r.p95.toFixed(0)} ms</b><br>`
+    + `${D.grao}: <b>${r.nomGrao}</b> (${r.forcat ? D.forcada : D.auto}) · ${D.crides}: ${r.crides} · ${D.mida}: ${r.mida}<br>${D.gpu}: ${escapa(r.gpu)}`;
+}
+function obreDiag() {
+  const d = $('#diag');
+  if (!d.hidden) { d.hidden = true; clearInterval(diag); return; }
+  const D = T.diag;
+  $('#diag-titol').textContent = D.titol;
+  $('#diag-tria').innerHTML = `<span>${D.tria}:</span>` + [D.auto, ...esc.GRAONS].map((n, i) => `<button type="button" data-g="${i - 1}">${n}</button>`).join('');
+  d.hidden = false; pintaDiag(); diag = setInterval(pintaDiag, 500);
+}
+document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'd' && esc) { e.preventDefault(); obreDiag(); } });
+$('#diag-tria').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const g = Number(b.dataset.g); esc.forcaGrao(g < 0 ? null : g); pintaDiag(); });
+$('#diag-tanca').addEventListener('click', obreDiag);
 
 arrenca();

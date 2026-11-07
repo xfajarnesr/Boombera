@@ -1,12 +1,20 @@
 // Tot el so es genera al navegador: no hi ha cap fitxer d'àudio.
 // La intensitat va de 0 (acaba de començar) a 1 (queda zero temps).
+// Dos canals que es poden silenciar per separat: la música (tensió i tic del rellotge) i els efectes
+// (botons, gir, errors, mòdul fet, explosió i desactivació).
+const CLAUS = { musica: 'boombera.so.musica', efectes: 'boombera.so.efectes' };
 export function creaSo() {
   let ctx = null;
   let mestre = null;
+  let busMusica = null;
+  let busEfectes = null;
   let musica = null;
-  let actiu = true;
+  const actiu = { musica: true, efectes: true };
   let sona = false;
-  let intensitat = 0;
+  let intensitat = 0; // la que sona, que segueix l'objectiu a poc a poc
+  let objectiu = 0;
+  let ultim = false; // queda l'últim error: entra una capa nova
+  let capaUltim = null;
   let cicle = null;
   let properCop = 0;
   let pas = 0;
@@ -14,7 +22,11 @@ export function creaSo() {
   let tremolo = null;
   let soroll = null;
 
-  try { actiu = localStorage.getItem('curtcircuit-so') !== 'no'; } catch (e) { /* sense emmagatzematge */ }
+  try {
+    // Qui tenia el so apagat amb l'interruptor antic, el troba tot apagat.
+    const antic = localStorage.getItem('curtcircuit-so') === 'no';
+    Object.keys(CLAUS).forEach((k) => { const v = localStorage.getItem(CLAUS[k]); actiu[k] = v ? v !== 'no' : !antic; });
+  } catch (e) { /* sense emmagatzematge */ }
 
   function prepara() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return; }
@@ -22,8 +34,10 @@ export function creaSo() {
     const limit = ctx.createDynamicsCompressor();
     limit.threshold.value = -10; limit.ratio.value = 10;
     mestre = ctx.createGain();
-    mestre.gain.value = actiu ? 0.8 : 0;
+    mestre.gain.value = 0.8;
     mestre.connect(limit).connect(ctx.destination);
+    busMusica = ctx.createGain(); busMusica.gain.value = actiu.musica ? 1 : 0; busMusica.connect(mestre);
+    busEfectes = ctx.createGain(); busEfectes.gain.value = actiu.efectes ? 1 : 0; busEfectes.connect(mestre);
   }
 
   function ressonancia(dur) {
@@ -74,11 +88,14 @@ export function creaSo() {
   const LA = 110; const SIB = 116.54; const MI = 164.81; const FA = 174.61;
   function programa() {
     if (!sona) return;
+    // La tensió no salta de cop: segueix l'objectiu en un segon i mig, cap amunt i cap avall.
+    intensitat += (objectiu - intensitat) * 0.06;
     while (properCop < ctx.currentTime + 0.25) {
       const bpm = 58 + intensitat * 96;
       const corxera = 60 / bpm / 2;
       const t = properCop;
-      if (pas % 4 === 0) batec(t, 0.42 + intensitat * 0.45);
+      // Amb l'últim error, el batec es dobla.
+      if (pas % 4 === 0 || (ultim && pas % 4 === 2)) batec(t, (0.42 + intensitat * 0.45) * (pas % 4 ? 0.6 : 1));
       if (intensitat > 0.12) {
         const f = pas % 8 < 6 ? LA : SIB;
         corda(t, f, 0.05 + intensitat * 0.1, corxera * 1.4);
@@ -94,6 +111,7 @@ export function creaSo() {
     tremolo.gain.setTargetAtTime(intensitat > 0.6 ? (intensitat - 0.6) * 0.2 : 0, t, 0.5);
     soroll.g.gain.setTargetAtTime(intensitat > 0.8 ? (intensitat - 0.8) * 0.5 : 0, t, 0.4);
     soroll.f.frequency.setTargetAtTime(600 + (intensitat - 0.8) * 22000, t, 0.5);
+    capaUltim.g.gain.setTargetAtTime(ultim ? 0.022 + intensitat * 0.02 : 0, t, 0.8);
   }
 
   function arrenca() {
@@ -104,8 +122,8 @@ export function creaSo() {
     musica.gain.value = 1;
     const sala = ressonancia(1.6); const sec = ctx.createGain(); const hum = ctx.createGain();
     sec.gain.value = 0.85; hum.gain.value = 0.25;
-    musica.connect(sec).connect(mestre);
-    musica.connect(sala).connect(hum).connect(mestre);
+    musica.connect(sec).connect(busMusica);
+    musica.connect(sala).connect(hum).connect(busMusica);
 
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 90; f.Q.value = 4;
     const g = ctx.createGain(); g.gain.value = 0.05;
@@ -128,28 +146,46 @@ export function creaSo() {
     src.connect(nf).connect(ng).connect(musica); src.start();
     soroll = { f: nf, g: ng, src };
 
-    intensitat = 0; pas = 0; properCop = ctx.currentTime + 0.05; sona = true;
+    // L'últim error: una nota aguda sostinguda que vibra una mica.
+    const uo = ctx.createOscillator(); const ug = ctx.createGain(); const uv = ctx.createOscillator(); const uvg = ctx.createGain();
+    uo.type = 'triangle'; uo.frequency.value = 1318.5; uv.frequency.value = 5.5; uvg.gain.value = 9;
+    uv.connect(uvg).connect(uo.frequency); ug.gain.value = 0;
+    uo.connect(ug).connect(musica); uo.start(); uv.start();
+    capaUltim = { g: ug, oscs: [uo, uv] };
+
+    intensitat = 0; objectiu = 0; ultim = false; pas = 0; properCop = ctx.currentTime + 0.05; sona = true;
     clearInterval(cicle); cicle = setInterval(programa, 80);
   }
 
   function atura(fosa = 0.3) {
     sona = false; clearInterval(cicle);
     if (!ctx || !musica) return;
-    const m = musica; const d = dron; const t = tremolo; const s = soroll;
+    const m = musica; const d = dron; const t = tremolo; const s = soroll; const u = capaUltim;
     m.gain.setTargetAtTime(0, ctx.currentTime, fosa / 3);
     setTimeout(() => {
-      try { d.oscs.forEach((o) => o.stop()); t.oscs.forEach((o) => o.stop()); s.src.stop(); m.disconnect(); } catch (e) { /* ja aturat */ }
+      try { d.oscs.forEach((o) => o.stop()); t.oscs.forEach((o) => o.stop()); u.oscs.forEach((o) => o.stop()); s.src.stop(); m.disconnect(); } catch (e) { /* ja aturat */ }
     }, fosa * 1000 + 200);
     musica = null;
   }
 
-  function to(freq, dur, tipus, vol) {
+  function to(freq, dur, tipus, vol, bus = busEfectes, quan = 0) {
     if (!ctx) return;
+    const t = ctx.currentTime + quan;
     const o = ctx.createOscillator(); const g = ctx.createGain();
     o.type = tipus; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
-    o.connect(g).connect(mestre); o.start(); o.stop(ctx.currentTime + dur + 0.02);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.02);
+  }
+  // Un clac sec de metall (pestell, relé, clonc): soroll filtrat molt curt.
+  function clac(freq, dur, vol, quan = 0) {
+    if (!ctx) return;
+    const t = ctx.currentTime + quan;
+    const src = ctx.createBufferSource(); src.buffer = sorollBuffer(dur + 0.02);
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 4;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(busEfectes); src.start(t); src.stop(t + dur + 0.02);
   }
 
   function explosio() {
@@ -157,18 +193,18 @@ export function creaSo() {
     if (!ctx) return;
     const t = ctx.currentTime;
     const sala = ressonancia(4); const hum = ctx.createGain(); hum.gain.value = 0.7;
-    sala.connect(hum).connect(mestre);
+    sala.connect(hum).connect(busEfectes);
 
     const src = ctx.createBufferSource(); src.buffer = sorollBuffer(3);
     const f = ctx.createBiquadFilter(); f.type = 'lowpass';
     f.frequency.setValueAtTime(9000, t); f.frequency.exponentialRampToValueAtTime(90, t + 2.4);
     const g = ctx.createGain(); g.gain.setValueAtTime(1.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.8);
-    src.connect(f).connect(g); g.connect(mestre); g.connect(sala); src.start(t);
+    src.connect(f).connect(g); g.connect(busEfectes); g.connect(sala); src.start(t);
 
     const sub = ctx.createOscillator(); const sg = ctx.createGain();
     sub.frequency.setValueAtTime(95, t); sub.frequency.exponentialRampToValueAtTime(22, t + 2);
     sg.gain.setValueAtTime(1.2, t); sg.gain.exponentialRampToValueAtTime(0.001, t + 2.6);
-    sub.connect(sg).connect(mestre); sub.start(t); sub.stop(t + 2.7);
+    sub.connect(sg).connect(busEfectes); sub.start(t); sub.stop(t + 2.7);
 
     // El xiulet a les orelles després del cop.
     const x = ctx.createOscillator(); const xg = ctx.createGain();
@@ -176,16 +212,39 @@ export function creaSo() {
     xg.gain.setValueAtTime(0.0001, t + 0.9);
     xg.gain.exponentialRampToValueAtTime(0.035, t + 1.6);
     xg.gain.exponentialRampToValueAtTime(0.0001, t + 6.5);
-    x.connect(xg).connect(mestre); x.start(t + 0.9); x.stop(t + 6.6);
+    x.connect(xg).connect(busEfectes); x.start(t + 0.9); x.stop(t + 6.6);
   }
+
+  const commuta = (k) => {
+    actiu[k] = !actiu[k];
+    const bus = k === 'musica' ? busMusica : busEfectes;
+    if (ctx && bus) bus.gain.setTargetAtTime(actiu[k] ? 1 : 0, ctx.currentTime, 0.02);
+    try { localStorage.setItem(CLAUS[k], actiu[k] ? 'si' : 'no'); } catch (e) { /* sense emmagatzematge */ }
+    return actiu[k];
+  };
 
   return {
     arrenca, atura, explosio,
-    intensitat(i) { intensitat = Math.max(0, Math.min(1, i)); },
-    tic(ultims) { if (sona) to(ultims ? 1250 : 800, 0.035, 'square', ultims ? 0.05 : 0.025); },
+    intensitat(i) { objectiu = Math.max(0, Math.min(1, i)); },
+    // Queda l'últim error abans de petar.
+    ultim(v) { ultim = Boolean(v); },
+    // Abans de l'explosió, un silenci sec.
+    silenci() { atura(0.02); },
+    tic(ultims) { if (sona) to(ultims ? 1250 : 800, 0.035, 'square', ultims ? 0.05 : 0.025, busMusica); },
     tall() { to(2100, 0.05, 'square', 0.07); },
-    error() { to(92, 0.45, 'sawtooth', 0.32); to(97, 0.45, 'sawtooth', 0.28); },
-    modul() { to(660, 0.14, 'triangle', 0.2); setTimeout(() => to(990, 0.22, 'triangle', 0.2), 110); },
+    // Amb marge, l'error avisa sense espantar; el que deixa l'últim marge sona com abans.
+    error(greu) {
+      if (greu) { to(92, 0.45, 'sawtooth', 0.32); to(97, 0.45, 'sawtooth', 0.28); return; }
+      clac(700, 0.06, 0.5); to(110, 0.26, 'sawtooth', 0.16); to(116.5, 0.26, 'sawtooth', 0.12);
+    },
+    // Mòdul resolt: el clac d'un pestell i dues notes que pugen.
+    modul() { clac(2400, 0.04, 0.6); to(660, 0.14, 'triangle', 0.2, busEfectes, 0.05); to(990, 0.22, 'triangle', 0.2, busEfectes, 0.16); },
+    // Armat: un clonc metàl·lic i la comprovació dels llums d'error.
+    armat(llums) {
+      if (!ctx) return;
+      clac(320, 0.18, 0.9); to(70, 0.3, 'sine', 0.4);
+      for (let i = 0; i < llums; i++) to(1500, 0.05, 'square', 0.03, busEfectes, 0.35 + i * 0.16);
+    },
     // Gir: fregament de metall que s'arrossega i un cop sord quan la bomba torna a quedar quieta.
     gir() {
       if (!ctx) return;
@@ -194,23 +253,22 @@ export function creaSo() {
       const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.6;
       f.frequency.setValueAtTime(380, t); f.frequency.exponentialRampToValueAtTime(900, t + 0.3); f.frequency.exponentialRampToValueAtTime(300, t + 0.58);
       const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.18); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
-      src.connect(f).connect(g).connect(mestre); src.start(t);
+      src.connect(f).connect(g).connect(busEfectes); src.start(t);
       const o = ctx.createOscillator(); const og = ctx.createGain();
       o.frequency.setValueAtTime(120, t + 0.58); o.frequency.exponentialRampToValueAtTime(48, t + 0.75);
       og.gain.setValueAtTime(0.0001, t + 0.58); og.gain.exponentialRampToValueAtTime(0.3, t + 0.59); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
-      o.connect(og).connect(mestre); o.start(t + 0.58); o.stop(t + 0.82);
+      o.connect(og).connect(busEfectes); o.start(t + 0.58); o.stop(t + 0.82);
     },
+    // Desactivada: salta el relé i sona un acord que es resol.
     guanya() {
       atura(0.5);
       if (!ctx) return;
-      [220, 329.63, 440, 554.37].forEach((f, i) => setTimeout(() => to(f, 2.4, 'triangle', 0.14), i * 110));
+      clac(1800, 0.05, 0.8); clac(900, 0.08, 0.5, 0.07);
+      [220, 329.63, 440, 554.37].forEach((f, i) => to(f, 2.4, 'triangle', 0.14, busEfectes, 0.15 + i * 0.11));
     },
-    get actiu() { return actiu; },
-    commuta() {
-      actiu = !actiu;
-      if (ctx && mestre) mestre.gain.setTargetAtTime(actiu ? 0.8 : 0, ctx.currentTime, 0.02);
-      try { localStorage.setItem('curtcircuit-so', actiu ? 'si' : 'no'); } catch (e) { /* sense emmagatzematge */ }
-      return actiu;
-    },
+    get musica() { return actiu.musica; },
+    get efectes() { return actiu.efectes; },
+    commutaMusica: () => commuta('musica'),
+    commutaEfectes: () => commuta('efectes'),
   };
 }

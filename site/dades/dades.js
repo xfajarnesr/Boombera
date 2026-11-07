@@ -15,6 +15,8 @@ export function creaServidor(url = CONFIG.servidor) {
   if (url) {
     return {
       remot: true,
+      // En tancar la pestanya, el navegador encara pot enviar la cua sense esperar resposta.
+      beacon(q) { try { return navigator.sendBeacon(url, JSON.stringify(q)); } catch { return false; } },
       async crida(q) {
         const atura = new AbortController();
         const t = setTimeout(() => atura.abort(), 20000);
@@ -80,7 +82,7 @@ export function creaDades(servidor = creaServidor()) {
   function millors() {
     if (!equip) return {};
     const m = { ...equip.millors };
-    for (const p of cua()) if (p.equip === equip.id && p.guanyada) m[p.missio] = N.millor(m[p.missio], { errors: p.errors, marge: p.marge });
+    for (const p of cua()) if (!p.altra && p.equip === equip.id && p.guanyada) m[p.missio] = N.millor(m[p.missio], { errors: p.errors, marge: p.marge });
     return m;
   }
   async function envia() {
@@ -116,6 +118,15 @@ export function creaDades(servidor = creaServidor()) {
     superades: () => Object.keys(millors()),
     pendents: () => cua().length,
     envia,
+    // Mentre es diu a config.js (els primers dies), també s'envien les partides sense equip i les missions lliures.
+    get registraTot() { return Boolean(CONFIG.registraTot); },
+    // En tancar la pestanya: s'envia el que hi ha a la cua sense esperar. Si no arriba, s'enviarà en tornar.
+    enviaAra() {
+      const pendents = cua();
+      if (!pendents.length) return;
+      if (servidor.beacon) servidor.beacon({ accio: 'desaPartides', equip: equip && equip.id, partides: pendents });
+      else envia();
+    },
     async creaEquip(nom, membres) {
       const r = await accio({ accio: 'creaEquip', nom, membres });
       if (r.ok) posaEquip(r.equip);
@@ -134,10 +145,11 @@ export function creaDades(servidor = creaServidor()) {
     },
     surt() { posaEquip(null); },
     // Desa una partida d'una missió (no de la missió lliure). Diu si és el millor resultat i quines seccions s'han obert.
-    registra({ missio, guanyada, errors, marge, agent, guia, versio }) {
+    // estat: «abandonada» si s'ha tancat la pestanya a mitja bomba. detall: errors i temps de cada mòdul.
+    registra({ missio, guanyada, errors, marge, agent, guia, versio, estat, detall }) {
       if (!equip) return { record: false };
       const abans = millors()[missio];
-      const p = { id: nouId(), data: new Date().toISOString(), equip: equip.id, missio, guanyada, errors, marge: guanyada ? marge : 0, agent, guia, versio };
+      const p = { id: nouId(), data: new Date().toISOString(), equip: equip.id, missio, guanyada, errors, marge: guanyada ? marge : 0, agent, guia, versio, estat: estat || (guanyada ? 'guanyada' : 'perduda'), detall };
       local(CLAUS.cua, [...cua(), p]);
       equip = { ...equip, agent, guia }; sessio(CLAUS.equip, equip);
       envia();
@@ -145,6 +157,16 @@ export function creaDades(servidor = creaServidor()) {
       const nou = { errors, marge };
       const record = guanyada && (!abans || (N.millor(abans, nou) === nou && (nou.errors !== abans.errors || nou.marge !== abans.marge)));
       return { record, primera: guanyada && !abans };
+    },
+    // Una partida que no compta per al progrés: sense equip o una missió lliure. Va a la pestanya «Altres partides».
+    registraAltra({ missio, moduls, segons, maxErrors, guanyada, errors, marge, versio, estat, detall }) {
+      const p = {
+        id: nouId(), data: new Date().toISOString(), altra: true, equip: equip ? equip.id : '', missio: missio || 'lliure', moduls: moduls.join(' '),
+        segons, max_errors: maxErrors, guanyada, estat: estat || (guanyada ? 'guanyada' : 'perduda'), errors, marge: guanyada ? marge : 0, versio, detall,
+      };
+      local(CLAUS.cua, [...cua(), p]);
+      envia();
+      avisa();
     },
     professor: (q) => accio(q),
   };

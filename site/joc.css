@@ -4,7 +4,7 @@ body { background: #050506; color: #eeece4; font-family: var(--text); overflow: 
 
 #bomba { position: fixed; inset: 0; }
 #escena { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-#alarma, #flaix, #sutge, #esquerdes { position: absolute; inset: 0; pointer-events: none; }
+#alarma, #flaix, #sutge, #esquerdes, #vinyeta { position: absolute; inset: 0; pointer-events: none; }
 
 :root { --alarma: 0; }
 #alarma {
@@ -14,19 +14,34 @@ body { background: #050506; color: #eeece4; font-family: var(--text); overflow: 
 }
 
 #flaix { background: #fff; opacity: 0; }
-body[data-fase="petada"] #flaix { animation: flaix 1.1s ease-out; }
+/* L'explosió arriba 0,3 s després del silenci. */
+body[data-fase="petada"] #flaix { animation: flaix 1.1s .3s ease-out both; }
 @keyframes flaix { 0% { opacity: 1; } 12% { opacity: .95; background: #ffe2a8; } 100% { opacity: 0; background: #ff5a14; } }
 
 #sutge { opacity: 0; background: radial-gradient(ellipse at center, #0000 18%, #000000d9 92%); }
-body[data-fase="petada"] #sutge { animation: sutge 3s ease-out forwards; }
+body[data-fase="petada"] #sutge { animation: sutge 3s .3s ease-out both; }
 @keyframes sutge { from { opacity: 0; } to { opacity: 1; } }
 
 #esquerdes svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-body[data-fase="petada"] #esquerdes { animation: apareix .05s .08s both; }
+body[data-fase="petada"] #esquerdes { animation: apareix .05s .38s both; }
 @keyframes apareix { from { opacity: 0; } to { opacity: 1; } }
 
 body.copet #escena { animation: copet .3s; }
-@keyframes copet { 20% { transform: translateX(-9px); filter: brightness(1.5) saturate(1.5); } 50% { transform: translateX(7px); } 75% { transform: translateX(-3px); } }
+@keyframes copet { 20% { transform: translateX(calc(-9px * var(--cop, 1))); filter: brightness(1.5) saturate(1.5); } 50% { transform: translateX(calc(7px * var(--cop, 1))); } 75% { transform: translateX(-3px); } }
+/* Penombra a les vores, sempre. Un error hi fa un cop de vermell, més fort si era el penúltim. */
+#vinyeta { background: radial-gradient(ellipse 75% 70% at 50% 48%, #0000 55%, #000a 100%); }
+body.copet #vinyeta { animation: vora .55s ease-out; }
+@keyframes vora { 0% { box-shadow: inset 0 0 calc(40px + 120px * var(--cop, 1)) calc(10px * var(--cop, 1)) #ff1a0a; } 100% { box-shadow: inset 0 0 0 0 #ff1a0a00; } }
+/* Desactivada: el segell. */
+/* Primer surt gran al mig de la bomba; quan arriba la nota, es queda com un tampó a la seva cantonada de dalt. */
+#segell {
+  position: absolute; left: 50%; top: 40%; z-index: 9; margin: 0; transform: translate(-50%, -50%) rotate(-6deg); display: none; pointer-events: none;
+  padding: 4px 18px; border: 4px solid #35ff77; color: #35ff77; font: 700 clamp(34px, 6vw, 64px)/1 var(--titols); text-transform: uppercase; letter-spacing: .12em;
+  background: #04140ad9; box-shadow: 0 0 30px #35ff7740; transition: top .35s, left .35s, font-size .35s;
+}
+body[data-fase="salvada"] #segell { display: block; animation: segell .45s cubic-bezier(.2, 1.6, .4, 1) both; }
+body[data-fase="salvada"]:has(#nota:not([hidden])) #segell { top: 34px; left: min(calc(50% + 300px), calc(100% - 110px)); font-size: clamp(20px, 2.4vw, 28px); }
+@keyframes segell { from { opacity: 0; scale: 1.7; } to { opacity: 1; scale: 1; } }
 
 #dianes { position: absolute; inset: 0; overflow: hidden; }
 body[data-fase="inici"] #dianes { pointer-events: none; }
@@ -40,23 +55,34 @@ body[data-fase="inici"] #dianes { pointer-events: none; }
 
 .diana[data-amagada="true"] { visibility: hidden; }
 
-/* Girar la bomba: un sol botó gran al costat dret, amb dos punts que diuen quina cara es veu. */
-#gira {
-  position: absolute; right: clamp(8px, 1.6vw, 28px); top: 50%; transform: translateY(-50%); z-index: 6;
-  width: clamp(58px, 6.2vw, 86px); aspect-ratio: 1 / 1.22; padding: 6px 4px; display: none;
-  flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  background: #0b0c0dd9; border: 1px solid #ffffff4d; border-radius: 6px; color: #eeece4; cursor: pointer;
-  box-shadow: 0 10px 30px #000c;
+/* Girar la bomba: una barra a sota, al centre, amb «Davant · Darrere» i la cara que es veu marcada. */
+#barra-gir {
+  position: absolute; left: 50%; bottom: max(6px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+  display: none; align-items: stretch; gap: 8px;
 }
-body[data-fase="joc"] #gira { display: flex; }
-#gira:hover, #gira:focus-visible { border-color: #fff; color: #fff; background: #1b1d1f; }
-#gira:active { transform: translateY(-50%) scale(.95); }
-body[data-girant="true"] #gira { color: #ff6a4a; border-color: #ff6a4a; }
-#gira svg { width: 100%; height: auto; display: block; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-#gira svg .full-bomba { fill: #ffffff26; stroke-width: 2.5; }
-#gira .punts { display: flex; gap: 7px; }
-#gira .punts i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid currentColor; }
-body[data-cara="0"] #gira .punts i:first-child, body[data-cara="1"] #gira .punts i:last-child { background: currentColor; }
+body[data-fase="joc"] #barra-gir { display: flex; }
+#gira {
+  display: flex; padding: 0; background: #0b0c0de6; border: 1px solid #ffffff4d; border-radius: 6px; color: #b9bab3; cursor: pointer;
+  box-shadow: 0 10px 30px #000c; overflow: hidden; font: 700 clamp(15px, 1.7vw, 20px)/1 var(--titols); text-transform: uppercase; letter-spacing: .08em;
+}
+#gira .cara { display: flex; align-items: center; gap: 8px; padding: clamp(7px, 1.1vh, 11px) clamp(12px, 1.8vw, 22px); transition: background .2s, color .2s; }
+#gira .cara + .cara { border-left: 1px solid #ffffff33; }
+#gira svg { width: 1.15em; height: 1.15em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+body[data-cara="0"] #gira .cara[data-c="0"], body[data-cara="1"] #gira .cara[data-c="1"] { background: #eeece4; color: #0b0c0d; }
+body[data-cara="0"] #gira .cara[data-c="0"] svg, body[data-cara="1"] #gira .cara[data-c="1"] svg { fill: #0b0c0d33; }
+#gira:hover, #gira:focus-visible { border-color: #fff; color: #fff; }
+#gira:active { transform: scale(.97); }
+body[data-girant="true"] #gira .cara { background: transparent; color: #ff6a4a; }
+/* Al mòbil, la lupa torna a veure tota la bomba quan una zona és ampliada. */
+#allunya {
+  display: none; width: clamp(42px, 5vw, 52px); padding: 0; place-items: center; background: #0b0c0de6; border: 1px solid #ffffff4d; border-radius: 6px; color: #eeece4; cursor: pointer;
+}
+body[data-ampliada]:not([data-ampliada=""]) #allunya { display: grid; }
+#allunya svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+/* Zones per ampliar (només amb el dit): a sota de les dianes, transparents. */
+.zona { position: absolute; left: 0; top: 0; -webkit-tap-highlight-color: transparent; }
+.zona[data-amagada="true"] { visibility: hidden; }
+body[data-fase="inici"] .zona { pointer-events: none; }
 body.fos #escena { animation: fos .3s; }
 @keyframes fos { 50% { opacity: 0; } }
 
@@ -68,6 +94,7 @@ body.fos #escena { animation: fos .3s; }
   padding: 0; border-radius: 3px; cursor: pointer;
 }
 #controls button:hover, #controls button:focus-visible { border-color: #fffa; color: #fff; }
+#controls button[aria-pressed="false"] { color: #ff3b2a; border-color: #ff3b2a99; }
 #controls svg { width: 22px; height: 22px; display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 #nota .lema { font-family: var(--titols); font-weight: 700; font-size: 24px; letter-spacing: .04em; text-transform: uppercase; color: #ff3b2a; margin-bottom: 10px; }
 
@@ -114,8 +141,11 @@ body[data-fase="inici"] #nota, body[data-fase="salvada"] #nota, body[data-fase="
 
 @media (max-width: 640px) { .seccio { grid-template-columns: repeat(4, 1fr); } .seccio h3 { grid-column: 1 / -1; flex-direction: row; gap: 8px; align-items: baseline; } .nivell span { display: none; } }
 @media (prefers-reduced-motion: reduce) {
-  body[data-fase="petada"] #flaix, body.copet #escena, body[data-fase="petada"] #esquerdes { animation: none; }
+  body[data-fase="petada"] #flaix, body.copet #escena, body[data-fase="petada"] #esquerdes, body[data-fase="salvada"] #segell { animation: none; transition: none; }
+  /* El flaix de l'explosió, sense parpelleig: un fos curt i suau. */
+  body[data-fase="petada"] #flaix { animation: flaix-suau .6s .3s ease-out both; }
 }
+@keyframes flaix-suau { 0% { opacity: .35; background: #ffb070; } 100% { opacity: 0; } }
 
 /* ---------- Equip, rols, progrés i codis ---------- */
 #equip-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: -6px 0 12px; padding: 8px 10px; border: 1px solid #3c3f40; background: #131516; }
@@ -206,12 +236,19 @@ body[data-panell="portada"] #controls { z-index: 10; }
 .logo { margin: 0; display: flex; align-items: center; justify-content: center; gap: .04em; font: 400 clamp(46px, 11vw, 124px)/1 var(--estargit); color: #eeece4; letter-spacing: .01em; }
 .logo .logo-visor { height: 1.02em; width: auto; margin: -.22em -.3em 0 .02em; overflow: visible; }
 #portada .lema { margin: 0; font: 700 clamp(18px, 3.2vw, 30px)/1 var(--titols); letter-spacing: .14em; text-transform: uppercase; color: #ff3b2a; cursor: default; user-select: none; -webkit-user-select: none; }
-.portada-botons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: clamp(6px, 2vh, 18px); }
+.portada-botons { display: flex; flex-direction: column; gap: clamp(10px, 2vh, 16px); align-items: center; margin-top: clamp(6px, 2vh, 18px); }
 .portada-botons button {
   min-width: 190px; min-height: 52px; padding: 10px 26px; font: 700 clamp(20px, 2.6vw, 26px)/1 var(--titols); text-transform: uppercase; letter-spacing: .06em;
   background: #0c0d0ee6; color: #eeece4; border: 1px solid #8a8d8b; cursor: pointer;
 }
-.portada-botons .principal { background: #ff2a14; border-color: #ff2a14; color: #fff; }
+/* «Missions» és el botó gran: és per on s'entra a jugar. El del manual queda a sota, més discret. */
+.portada-botons .principal {
+  display: inline-flex; align-items: center; gap: .45em; min-width: min(360px, 80vw); min-height: clamp(62px, 10vh, 84px); justify-content: center;
+  font-size: clamp(30px, 4.4vw, 46px); letter-spacing: .1em; background: #ff2a14; border-color: #ff2a14; color: #fff;
+  box-shadow: 0 0 0 0 #ff2a1466, 0 14px 40px #000c; animation: crida 2.4s ease-in-out 3s infinite;
+}
+.portada-botons .principal svg { width: .8em; height: .8em; }
+@keyframes crida { 0%, 60%, 100% { box-shadow: 0 0 0 0 #ff2a1400, 0 14px 40px #000c; } 30% { box-shadow: 0 0 0 10px #ff2a1433, 0 14px 40px #000c; } }
 .portada-botons button:hover, .portada-botons button:focus-visible { border-color: #fff; color: #fff; }
 .portada-botons .principal:hover, .portada-botons .principal:focus-visible { background: #ff4a33; }
 #portada-equip { margin: 0; font-size: 16px; color: #cfd2cc; }
@@ -220,13 +257,13 @@ body[data-panell="portada"] #controls { z-index: 10; }
 #portada-equip i { font-style: normal; color: #ffd796; }
 /* El manual és el segon botó de la portada: gran, perquè la Guia el trobi i el baixi de seguida. */
 #portada-manual {
-  display: inline-flex; align-items: center; gap: 12px; min-height: 52px; min-width: 190px; padding: 8px 20px 8px 16px; text-align: left; text-decoration: none;
-  background: #0c0d0ee6; color: #eeece4; border: 1px solid #8a8d8b;
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 16px 6px 12px; text-align: left; text-decoration: none;
+  background: #0c0d0ecc; color: #cfd0ca; border: 1px solid #5c5f5f;
 }
-#portada-manual b { display: block; font: 700 clamp(20px, 2.6vw, 26px)/1 var(--titols); text-transform: uppercase; letter-spacing: .06em; }
-#portada-manual small { display: block; margin-top: 3px; font-size: 14px; color: #b9b7af; }
+#portada-manual b { display: block; font: 700 clamp(16px, 1.8vw, 19px)/1 var(--titols); text-transform: uppercase; letter-spacing: .06em; }
+#portada-manual small { display: block; margin-top: 2px; font-size: 13px; color: #9ea29c; }
 #portada-manual:hover, #portada-manual:focus-visible { border-color: #fff; color: #fff; }
-#portada-manual svg { flex: none; width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#portada-manual svg { flex: none; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- Com es juga ---------- */
 #com-es-juga { position: absolute; inset: 0; z-index: 12; display: grid; place-items: center; padding: 16px; background: #000000b8; }
@@ -286,7 +323,9 @@ body[data-espera-gir="true"] #gira-mobil { display: flex; }
   #portada { gap: 6px; padding: 10px 16px; }
   .logo { font-size: clamp(40px, 15vh, 80px); }
   .portada-botons { margin-top: 4px; }
-  .portada-botons button, #portada-manual { min-height: 46px; min-width: 170px; padding: 6px 18px; }
+  .portada-botons { flex-direction: row; align-items: center; }
+  .portada-botons .principal { min-height: 56px; min-width: 240px; font-size: 32px; }
+  #portada-manual { min-height: 44px; }
   .seccio { grid-template-columns: 120px repeat(4, 1fr); }
   .nivell { padding: 5px 7px; }
   .nivell strong { font-size: 19px; }
@@ -299,7 +338,6 @@ body[data-espera-gir="true"] #gira-mobil { display: flex; }
 @media (pointer: coarse) { .diana::before { content: ""; position: absolute; inset: -6px; border-radius: inherit; } }
 /* Mòbils amb osca: res important sota l'osca ni sota les vores arrodonides (viewport-fit=cover). */
 #controls { top: max(8px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); }
-#gira { right: max(clamp(8px, 1.6vw, 28px), env(safe-area-inset-right)); }
 #portada { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
 /* Amb el «Com es juga» obert, la portada no es veu a través. */
 body[data-ajuda="true"] #portada { visibility: hidden; }
@@ -309,3 +347,38 @@ body[data-ajuda="true"] #portada { visibility: hidden; }
   body[data-fase="inici"]:not([data-panell="entra"]) #nota-titol, body[data-fase="inici"]:not([data-panell="entra"]) #nota .lema { display: none; }
 }
 @media (max-height: 480px) { #controls { flex-direction: column; } }
+
+/* ---------- Arrencada de la portada ---------- */
+/* 2,5 s la primera vegada a cada pestanya: negre, el focus que parpelleja, el visor que s'encén segment a segment,
+   la metxa, el lema i els botons. Amb «moviment reduït», tot hi és des del principi. */
+#portada::before { content: ""; position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: -1; }
+#portada > * { position: relative; }
+body[data-arrencada="en-marxa"] #portada::before { animation: focus 1.1s steps(1, end) both; }
+@keyframes focus { 0% { opacity: 1; } 30% { opacity: .55; } 36% { opacity: 1; } 52% { opacity: .2; } 58% { opacity: .8; } 70% { opacity: 0; } 100% { opacity: 0; } }
+body[data-arrencada="en-marxa"] #portada .logo > span { animation: entra .5s .65s both; }
+body[data-arrencada="en-marxa"] #portada .segment { animation: segment .08s calc(.8s + var(--i) * .07s) both; }
+@keyframes segment { from { fill: #140504; } to { fill: #ff2a14; } }
+body[data-arrencada="en-marxa"] #portada .espurna { animation: encen .3s 1.7s both; }
+@keyframes encen { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: scale(1); } }
+body[data-arrencada="en-marxa"] #portada .lema { animation: puja .45s 1.9s both; }
+body[data-arrencada="en-marxa"] #portada .portada-botons, body[data-arrencada="en-marxa"] #portada-equip { animation: puja .45s 2.1s both; }
+@keyframes entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes puja { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+/* La metxa no para d'espurnejar. */
+#portada .espurna { transform-box: fill-box; transform-origin: center; }
+body[data-arrencada="feta"] #portada .espurna { animation: espurneja .5s ease-in-out infinite alternate; }
+@keyframes espurneja { from { transform: scale(.82) rotate(0); opacity: .85; } to { transform: scale(1.12) rotate(14deg); opacity: 1; } }
+#portada .logo-visor { filter: drop-shadow(0 0 10px #ff2a1455); }
+@media (prefers-reduced-motion: reduce) {
+  #portada .espurna, body[data-arrencada="feta"] #portada .espurna, .portada-botons .principal { animation: none !important; }
+}
+
+/* ---------- Indicador de rendiment (Ctrl + Alt + D) ---------- */
+#diag { position: absolute; left: 10px; bottom: 70px; z-index: 15; max-width: min(460px, calc(100% - 20px)); padding: 10px 34px 10px 12px; background: #000000e0; border: 1px solid #5c5f5f; font: 13px/1.45 ui-monospace, monospace; color: #e8e6de; }
+#diag[hidden] { display: none; }
+#diag h2 { margin: 0 0 4px; font: 700 14px var(--titols); text-transform: uppercase; letter-spacing: .08em; color: #ffae12; }
+#diag p { margin: 0 0 6px; }
+#diag b { color: #fff; }
+#diag-tria { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+#diag-tria button, #diag-tanca { background: #1b1d1f; border: 1px solid #5c5f5f; color: #fff; font: 12px var(--text); padding: 3px 7px; cursor: pointer; }
+#diag-tanca { position: absolute; top: 6px; right: 6px; }

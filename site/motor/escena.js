@@ -14,12 +14,20 @@ export const ESPAIS = [
 // Ranures de la carcassa a la capçalera de cada cara, dues a cada banda del temporitzador.
 const RANURES = [-5.05, -3.05, 3.05, 5.05];
 const GIR_MS = 620; // durada del gir
-const MARGE = 0.9; // espai a cada costat per al botó de girar
+const BAIX = 0.8; // espai a sota per a la barra de girar
+const ZOOM_MS = 380; // durada d'apropar o allunyar la càmera a una zona (mòbil)
+// Graons de qualitat: el motor baixa sol si el PC no arriba i torna a pujar (com a molt una vegada) si va folgat.
+const GRAONS = [
+  { nom: 'alta', pr: 1.5, ombra: 1536, suau: true, ombres: true, entorn: 0.32, parts: 1, parallax: true },
+  { nom: 'mitjana', pr: 1, ombra: 1024, suau: false, ombres: true, entorn: 0.32, parts: 1, parallax: true },
+  { nom: 'baixa', pr: 0.75, ombra: 512, suau: false, ombres: true, entorn: 0.25, parts: 0.5, parallax: true },
+  { nom: 'mínima', pr: 0.6, ombra: 512, suau: false, ombres: false, entorn: 0, parts: 0.35, parallax: false },
+];
 
 export function creaEscena(canvas, senseMoviment) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  let qualitat = Math.min(window.devicePixelRatio || 1, 1.5);
-  renderer.setPixelRatio(qualitat);
+  const dpr = window.devicePixelRatio || 1;
+  renderer.setPixelRatio(Math.min(dpr, 1.5));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
@@ -38,10 +46,13 @@ export function creaEscena(canvas, senseMoviment) {
   clau.shadow.camera.near = 8; clau.shadow.camera.far = 40;
   scene.add(clau, clau.target);
   const omplir = new THREE.DirectionalLight(0x9fb4cc, 0.4); omplir.position.set(8, -3, 10); scene.add(omplir);
+  // Contrallum: retalla les arestes de la bomba sobre la paret fosca.
+  const contra = new THREE.DirectionalLight(0xc8d4e0, 0.9); contra.position.set(-3, 9, -9); scene.add(contra);
 
+  // Les alarmes són als costats i una mica per darrere: tenyeixen la paret i els cantells, i deixen llegir els mòduls.
   const alarmes = [-1, 1].map((s) => {
     const l = new THREE.PointLight(0xff1208, 0, 34, 1.5);
-    l.position.set(s * (AMPLE / 2 + 1.6), ALT / 2 - 0.3, 3.2);
+    l.position.set(s * (AMPLE / 2 + 1.8), ALT / 2 - 0.3, -0.6);
     scene.add(l);
     return l;
   });
@@ -67,7 +78,16 @@ export function creaEscena(canvas, senseMoviment) {
   const flaixLlum = new THREE.PointLight(0xffc27a, 0, 90, 1.2); flaixLlum.position.set(0, 0, 5); scene.add(flaixLlum);
   const dianes = new Map();
   const ptr = { x: 0, y: 0, sx: 0, sy: 0 };
-  let dist = 40; let entrada = 0;
+  let dist = 40; let entrada = 0; let entradaMs = 1100; let entradaArc = 0;
+  let portada = false;
+  // Armat: els mòduls entren al seu lloc d'un en un i els llums d'error es comproven.
+  const A = { t0: 0, ms: 0, actiu: false, n: 0 };
+  // Efectes curts: mòdul resolt, error, desactivada.
+  const efectes = [];
+  // Ampliar una zona (al mòbil): la càmera s'hi apropa.
+  const Z = { zona: null, t0: -1e9, de: null, deMira: null, ara: new THREE.Vector3(), mira: new THREE.Vector3(), actiu: false };
+  const zones = new Map();
+  let salvadaT = -1;
   // La càmera segueix una mica el ratolí. Amb el dit no: cada toc la faria saltar.
   window.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return;
@@ -79,8 +99,8 @@ export function creaEscena(canvas, senseMoviment) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     const vfov = THREE.MathUtils.degToRad(camera.fov);
-    const perAlt = (ALT + 0.8) / (2 * Math.tan(vfov / 2));
-    const perAmple = (AMPLE + 1 + 2 * MARGE) / (2 * Math.tan(vfov / 2) * camera.aspect);
+    const perAlt = (ALT + 0.8 + BAIX) / (2 * Math.tan(vfov / 2));
+    const perAmple = (AMPLE + 1) / (2 * Math.tan(vfov / 2) * camera.aspect);
     dist = Math.max(perAlt, perAmple) + 0.4;
     camera.updateProjectionMatrix();
   }
@@ -101,6 +121,9 @@ export function creaEscena(canvas, senseMoviment) {
     parts.length = 0; volen.length = 0;
     dianes.clear();
     estat = 'repos'; tExplosio = 0; sacseig = 0; nivellFlaix = 0; flaixLlum.intensity = 0;
+    zones.clear(); Z.zona = null; Z.actiu = false; Z.t0 = -1e9; A.actiu = false; salvadaT = -1;
+    efectes.splice(0).forEach((f) => f.fi && f.fi());
+    clau.color.set(0xfff1dd);
     arrel.position.set(0, 0, FONS / 2); arrel.rotation.set(0, 0, 0);
     eix.position.set(0, 0, -FONS / 2); eix.rotation.set(0, 0, 0);
     Object.assign(G, { cara: 0, angle: 0, de: 0, a: 0, girant: false, fiMs: -1e9 });
@@ -129,6 +152,7 @@ export function creaEscena(canvas, senseMoviment) {
     });
     cares.forEach((grup, c) => {
       const cap = creaCapcalera(bomba, versio, M, c, timer, maxErrors);
+      cap.grup.userData.capcalera = true;
       grup.add(cap.grup); peces.push(cap.grup);
       timers.push(cap.timer); errors.push(cap.errors);
     });
@@ -138,7 +162,7 @@ export function creaEscena(canvas, senseMoviment) {
     // Peces petites que fan ombra: mentre la bomba gira no es noten i es deixen de calcular.
     ombresPetites = []; cares.forEach((c) => c.traverse((o) => { if (o.isMesh && o.castShadow) ombresPetites.push(o); }));
     vista = { moduls, peces, timer, errors, casc, balises };
-    entrada = senseMoviment ? 1 : 0;
+    entrada = senseMoviment ? 1 : 0; entradaMs = 1100; entradaArc = 0;
     temps0 = performance.now();
     return vista;
   }
@@ -167,30 +191,91 @@ export function creaEscena(canvas, senseMoviment) {
     });
   }
 
-  let anterior = performance.now(); let frames = 0; let tMesura = anterior; let baixat = false;
+  /* ---------- Rendiment ---------- */
+  // Es mesura el temps de cada fotograma (mediana i el 5 % més lent) en finestres de 2 s.
+  // Baixa un graó si la mediana passa de 36 ms o el 5 % més lent de 70 ms; puja com a molt una vegada si va folgat 10 s.
+  // A les proves (rellotge de mentida, window.__ms) no es mesura: allà els fotogrames van espaiats a posta.
+  let graoAuto = 0; let graoForcat = null; let pujades = 0; let tCanvi = 0; let folgat = 0;
+  let mostres = []; let tFinestra = performance.now();
+  const ultimaMesura = { mediana: 0, p95: 0, fps: 0 };
+  const grao = () => (graoForcat === null ? graoAuto : graoForcat);
+  function aplicaGrao() {
+    const g = GRAONS[grao()];
+    renderer.setPixelRatio(Math.min(dpr, g.pr));
+    if (clau.shadow.mapSize.x !== g.ombra) {
+      clau.shadow.mapSize.set(g.ombra, g.ombra);
+      if (clau.shadow.map) { clau.shadow.map.dispose(); clau.shadow.map = null; }
+    }
+    renderer.shadowMap.type = g.suau ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    clau.castShadow = g.ombres;
+    scene.environmentIntensity = g.entorn;
+    mida();
+  }
+  function mesura(ara, durada) {
+    // Tampoc els 3 primers segons: el navegador encara prepara els gràfics i els fotogrames llargs no diuen res del PC.
+    if (window.__ms !== undefined || document.hidden || estat === 'petada' || durada > 1000 || ara < 3000) { mostres = []; tFinestra = ara; return; }
+    mostres.push(durada);
+    if (ara - tFinestra < 2000) return;
+    const o = mostres.slice().sort((x, y) => x - y);
+    ultimaMesura.mediana = o[Math.floor(o.length / 2)] || 0;
+    ultimaMesura.p95 = o[Math.min(o.length - 1, Math.floor(o.length * 0.95))] || 0;
+    ultimaMesura.fps = mostres.length * 1000 / (ara - tFinestra);
+    mostres = []; tFinestra = ara;
+    if (graoForcat !== null || ara - tCanvi < 2000) return;
+    const lent = ultimaMesura.mediana > 36 || ultimaMesura.p95 > 70;
+    const rapid = ultimaMesura.mediana < 18 && ultimaMesura.p95 < 28;
+    if (lent && graoAuto < GRAONS.length - 1) { graoAuto += 1; tCanvi = ara; folgat = 0; aplicaGrao(); return; }
+    folgat = rapid ? folgat + 1 : 0;
+    if (folgat >= 5 && graoAuto > 0 && pujades < 1) { graoAuto -= 1; pujades += 1; tCanvi = ara; folgat = 0; aplicaGrao(); }
+  }
+
+  /* ---------- Càmera ---------- */
+  const suauZoom = (u) => 1 - Math.pow(1 - u, 3);
+  const zonaVista = new THREE.Vector3(); const zonaMira = new THREE.Vector3();
+  function calculaZona(z) {
+    z.obj.updateWorldMatrix(true, false);
+    zonaMira.set(z.x, z.y, z.z).applyMatrix4(z.obj.matrixWorld);
+    const t = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    // Amb marge per a la barra de sota: la zona queda una mica amunt.
+    const d = Math.max(z.h * 1.38 / (2 * t), z.w * 1.12 / (2 * t * camera.aspect));
+    zonaMira.y -= z.h * 0.08;
+    zonaVista.copy(zonaMira).add(new THREE.Vector3(0, 0, d));
+  }
+
+  let anterior = performance.now(); let darrerDibuix = 0;
   function pas(ara) {
     requestAnimationFrame(pas);
-    const dtReal = Math.min(0.3, (ara - anterior) / 1000); const dt = Math.min(0.05, dtReal); anterior = ara;
+    const durada = ara - anterior;
+    const dtReal = Math.min(0.3, durada / 1000); const dt = Math.min(0.05, dtReal); anterior = ara;
     const t = (ara - temps0) / 1000;
-
-    frames++;
-    if (!baixat && ara - tMesura > 2500) {
-      const fps = frames * 1000 / (ara - tMesura); frames = 0; tMesura = ara;
-      if (fps < 24) { // ordinadors justos: menys resolució i ombres més simples
-        baixat = true; qualitat = 1; renderer.setPixelRatio(1); clau.shadow.mapSize.set(768, 768);
-        if (clau.shadow.map) { clau.shadow.map.dispose(); clau.shadow.map = null; }
-        renderer.shadowMap.type = THREE.PCFShadowMap; mida();
-      }
-    }
+    mesura(ara, durada);
+    const G0 = GRAONS[grao()];
+    const rellotge = performance.now();
 
     // Càmera
     // L'entrada de la càmera va pel rellotge, no pels fotogrames: en un PC lent dura el mateix.
-    entrada = senseMoviment ? 1 : Math.min(1, Math.max(entrada, (performance.now() - temps0) / 1100));
+    entrada = senseMoviment ? 1 : Math.min(1, Math.max(entrada, (rellotge - temps0) / entradaMs));
     const e = 1 - Math.pow(1 - entrada, 3);
     ptr.sx += (ptr.x - ptr.sx) * Math.min(1, dt * 3); ptr.sy += (ptr.y - ptr.sy) * Math.min(1, dt * 3);
-    const px = senseMoviment ? 0 : ptr.sx * 0.1; const py = senseMoviment ? 0 : ptr.sy * 0.07;
-    camera.position.set(px, -py - 0.1, dist + (1 - e) * 5 + (estat === 'petada' ? 2 : 0));
-    camera.lookAt(0, -0.12, 0);
+    const mou = !senseMoviment && G0.parallax;
+    const px = mou ? ptr.sx * 0.1 : 0; const py = mou ? ptr.sy * 0.07 : 0;
+    // A la portada, la càmera respira a poc a poc.
+    const resp = portada && mou ? Math.sin(t * 0.42) : 0;
+    const arc = Math.sin(Math.PI * e) * entradaArc;
+    camera.position.set(px + arc + (portada && mou ? Math.sin(t * 0.27) * 0.12 : 0), -py - 0.1 - BAIX / 2, dist + (1 - e) * 5 * (entradaMs / 1100) + resp * 0.3 + (estat === 'petada' ? 2 : 0));
+    const mira = new THREE.Vector3(0, -0.12 - BAIX / 2, 0);
+    // Zona ampliada: la càmera hi va (i en torna) en ZOOM_MS; amb «moviment reduït», de cop.
+    const uz = senseMoviment ? 1 : Math.min(1, (rellotge - Z.t0) / ZOOM_MS);
+    const desti = Z.zona && zones.get(Z.zona);
+    if (desti) calculaZona(desti);
+    if (uz < 1 || desti) {
+      const k = suauZoom(uz);
+      const cap = desti ? zonaVista : camera.position; const capMira = desti ? zonaMira : mira;
+      if (Z.de && uz < 1) { camera.position.lerpVectors(Z.de, cap, k); mira.lerpVectors(Z.deMira, capMira, k); } else { camera.position.copy(cap); mira.copy(capMira); }
+    }
+    Z.ara.copy(camera.position); Z.mira.copy(mira);
+    Z.actiu = uz < 1;
+    camera.lookAt(mira);
     if (sacseig > 0.001 && !senseMoviment) {
       camera.position.x += (Math.random() - 0.5) * sacseig; camera.position.y += (Math.random() - 0.5) * sacseig;
       camera.rotation.z = (Math.random() - 0.5) * sacseig * 0.04;
@@ -203,21 +288,118 @@ export function creaEscena(canvas, senseMoviment) {
     const quant = estat === 'joc' ? intensitat * intensitat : 0;
     const puls = senseMoviment ? 0.7 : fase;
     alarmes.forEach((l) => { l.intensity = quant * (140 + 660 * puls) + (estat === 'joc' ? 12 : 0); });
-    clau.intensity = estat === 'petada' ? 170 : estat === 'salvada' ? 460 : 400 * (1 - quant * 0.62);
+    // La llum dura baixa poc amb l'alarma, perquè els colors dels mòduls es continuïn llegint.
+    clau.intensity = estat === 'petada' ? 170 : estat === 'salvada' ? 460 : 400 * (1 - quant * 0.3);
     (vista.balises || []).forEach((m) => {
       m.material.emissiveIntensity = estat === 'joc' ? 0.25 + quant * 3.4 * puls : 0.05;
     });
     document.documentElement.style.setProperty('--alarma', estat === 'joc' ? (quant * (0.35 + 0.65 * puls)).toFixed(3) : '0');
 
-    animaGir(performance.now());
+    animaGir(rellotge);
+    animaArmat(rellotge);
+    animaSalvada(rellotge);
+    animaEfectes(rellotge);
     if (estat === 'petada') animaExplosio(dtReal);
+    else animaParticules(dtReal);
     Object.values(vista.moduls).forEach((m) => m.userData.anima && m.userData.anima(dt));
 
     posaDianes();
-    renderer.render(scene, camera);
-    // Les proves esperen aquest estat abans de prémer res: la càmera ha acabat d'entrar i la bomba no gira.
-    const quieta = String(entrada >= 1 && !G.girant && estat !== 'petada');
+    // A la portada n'hi ha prou amb 30 fotogrames per segon.
+    if (!(portada && ara - darrerDibuix < 32)) { renderer.render(scene, camera); darrerDibuix = ara; }
+    // Les proves esperen aquest estat abans de prémer res: la càmera ha acabat d'entrar, la bomba no gira,
+    // no s'està armant i la càmera no s'està apropant a cap zona.
+    const quieta = String(entrada >= 1 && !G.girant && estat !== 'petada' && !A.actiu && !Z.actiu);
     if (canvas.dataset.quieta !== quieta) canvas.dataset.quieta = quieta;
+  }
+
+  /* ---------- Armat ---------- */
+  // Els mòduls s'enfonsen i tornen al seu lloc d'un en un, amb un cop, i els llums d'error s'encenen en cadena.
+  function arma(ms) {
+    A.t0 = performance.now(); A.ms = ms; A.actiu = true; canvas.dataset.quieta = 'false';
+    A.peces = vista.peces.filter((g) => !g.userData.capcalera);
+    A.peces.forEach((g) => { g.userData.z0 = g.userData.z0 !== undefined ? g.userData.z0 : g.position.z; });
+    A.n = vista.errors[0] ? vista.errors[0].length : 0;
+  }
+  function animaArmat(ara) {
+    if (!A.actiu) return;
+    const u = (ara - A.t0) / A.ms;
+    const pasMod = 0.55 / Math.max(1, A.peces.length);
+    A.peces.forEach((g, i) => {
+      if (senseMoviment) return;
+      const v = Math.min(1, Math.max(0, (u - i * pasMod) / 0.25));
+      g.position.z = g.userData.z0 - 0.45 * (1 - suauZoom(v));
+    });
+    // Comprovació dels llums: s'encenen un rere l'altre i s'apaguen.
+    const llum = Math.floor((u - 0.3) / 0.13);
+    vista.errors.flat().forEach((m) => { const on = u > 0.3 && u < 0.3 + A.n * 0.13 + 0.12 && m.userData.i === llum; m.material.emissiveIntensity = on ? 3.2 : 0; m.material.color.set(on ? 0xff2a1a : 0x3a2320); });
+    if (u >= 1) {
+      A.actiu = false;
+      A.peces.forEach((g) => { g.position.z = g.userData.z0; });
+      vista.errors.flat().forEach((m) => { m.material.emissiveIntensity = 0; m.material.color.set(0x3a2320); });
+    }
+  }
+
+  /* ---------- Efectes ---------- */
+  function animaEfectes(ara) {
+    for (let i = efectes.length - 1; i >= 0; i--) {
+      const f = efectes[i]; const u = (ara - f.t0) / f.ms;
+      if (u >= 1) { f.pas(1); if (f.fi) f.fi(); efectes.splice(i, 1); } else f.pas(u);
+    }
+  }
+  // Mòdul resolt: un pols de llum verda des del mòdul i el mòdul s'enfonsa una mica.
+  function celebra(nom) {
+    const g = vista.moduls[nom]; if (!g) return;
+    const llum = new THREE.PointLight(0x35ff77, 0, 9, 1.6);
+    const p = new THREE.Vector3(); g.getWorldPosition(p); llum.position.copy(p).setZ(p.z + 1.4); scene.add(llum);
+    const z0 = g.position.z;
+    efectes.push({
+      t0: performance.now(), ms: senseMoviment ? 400 : 650,
+      pas(u) { llum.intensity = 60 * Math.sin(Math.PI * Math.min(1, u * 1.3)); if (!senseMoviment) g.position.z = z0 - 0.05 * suauZoom(Math.min(1, u * 2)); },
+      fi() { scene.remove(llum); llum.dispose(); },
+    });
+  }
+  // Error: espurnes des del mòdul i el darrer llum d'error s'encén amb un esclat. «greu»: era el penúltim.
+  function avisaError(nom, nErrors, greu) {
+    const g = vista.moduls[nom];
+    if (g && !senseMoviment) {
+      const p = new THREE.Vector3(); g.getWorldPosition(p); p.z += 0.4;
+      const quantes = Math.round((greu ? 34 : 18) * GRAONS[grao()].parts);
+      for (let i = 0; i < quantes; i++) {
+        const v = new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 1.6 - 0.2, Math.random()).normalize().multiplyScalar(4 + Math.random() * 7);
+        parts.push({ s: sprite(textures.espurna, { suma: true, color: new THREE.Color(0xffb050), op: 1, mida: 0.16, p: p.clone(), depth: false }), v, vida: 0.35 + Math.random() * 0.5, edat: 0, de: 0.18, a: 0.04, op: 1, frega: 1.5, g: 14 });
+      }
+    }
+    const llums = vista.errors.flat().filter((m) => m.userData.i === nErrors - 1);
+    efectes.push({
+      t0: performance.now(), ms: 420,
+      pas(u) { llums.forEach((m) => { const k = senseMoviment ? 1 : 1 + 0.6 * Math.sin(Math.PI * u); m.scale.set(k, k, 0.6 * k); m.material.emissiveIntensity = 3.2 + 6 * (1 - u); }); },
+      fi() { llums.forEach((m) => { m.scale.set(1, 1, 0.6); m.material.emissiveIntensity = 3.2; }); },
+    });
+  }
+  // Partícules fora de l'explosió (les espurnes dels errors).
+  function animaParticules(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]; p.edat += dt;
+      const u = p.edat / p.vida;
+      if (u >= 1) { particules.remove(p.s); p.s.material.dispose(); parts.splice(i, 1); continue; }
+      p.v.multiplyScalar(Math.exp(-dt * p.frega));
+      if (p.g) p.v.y -= p.g * dt;
+      p.s.position.addScaledVector(p.v, dt);
+      p.s.scale.setScalar(p.de + (p.a - p.de) * u);
+      p.s.material.opacity = p.op * (1 - u);
+    }
+  }
+
+  /* ---------- Desactivada ---------- */
+  // Les alarmes s'apaguen una a una, la llum passa a blanca i la bomba s'allunya una mica, com si respirés.
+  function animaSalvada(ara) {
+    if (salvadaT < 0) return;
+    const w = (ara - salvadaT) / 1000;
+    alarmes.forEach((l, i) => { l.intensity = w < 0.15 + i * 0.3 ? 220 : 0; });
+    (vista.balises || []).forEach((m, i) => { m.material.emissiveIntensity = w < 0.15 + i * 0.3 ? 2 : 0; });
+    const k = Math.min(1, w / 1.2);
+    clau.color.setRGB(1, 0.945 + 0.055 * k, 0.867 + 0.133 * k);
+    if (!senseMoviment) eix.position.z = -FONS / 2 - 0.7 * suauZoom(k);
   }
 
   /* ---------- Gir ---------- */
@@ -225,7 +407,7 @@ export function creaEscena(canvas, senseMoviment) {
   // i en arribar fa un petit balanceig. La càmera no es mou, perquè no maregi.
   const suau = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
   function gira(sentit = 1) {
-    if (G.girant || estat === 'petada') return false;
+    if (G.girant || estat === 'petada' || A.actiu) return false;
     G.girant = true; G.de = G.angle; G.a = G.angle + sentit * Math.PI; G.t0 = performance.now();
     cares.forEach((c) => { c.visible = true; });
     dianes.forEach((d, el) => { el.dataset.amagada = 'true'; });
@@ -285,15 +467,21 @@ export function creaEscena(canvas, senseMoviment) {
         m.material.emissive = new THREE.Color(0x3a0e02); m.material.emissiveIntensity = 0.8; m.material.userData.propi = true;
       }
     });
-    for (let i = 0; i < 70; i++) {
+    const pq = GRAONS[grao()].parts;
+    for (let i = 0; i < 70 * pq; i++) {
       const v = new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), Math.random()).normalize().multiplyScalar(7 + Math.random() * 13);
       parts.push({ s: sprite(textures.foc, { suma: true, color: new THREE.Color().setHSL(0.03 + Math.random() * 0.07, 1, 0.55), op: 1, mida: 1.5, p: o.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2, 1)), depth: false }), v, vida: 0.5 + Math.random() * 0.9, edat: 0, de: 1.5 + Math.random() * 2, a: 7 + Math.random() * 7, op: 1, frega: 2.6 });
     }
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 46 * pq; i++) {
       const v = new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 4 + 0.6, (Math.random() - 0.2) * 3);
       parts.push({ s: sprite(textures.fum, { color: new THREE.Color(0x0e0c0b), op: 0, mida: 3, p: o.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, 1.2)), depth: false }), v, vida: 4.5 + Math.random() * 4, edat: -Math.random() * 0.5, de: 2.5, a: 9 + Math.random() * 7, op: 0.85, frega: 0.35, fum: true });
     }
-    for (let i = 0; i < 90; i++) {
+    // Un fum baix que es queda una bona estona.
+    for (let i = 0; i < 10 * pq; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 0.6, 0.25 + Math.random() * 0.3, 0);
+      parts.push({ s: sprite(textures.fum, { color: new THREE.Color(0x15110e), op: 0, mida: 6, p: o.clone().add(new THREE.Vector3((Math.random() - 0.5) * 10, -2 + Math.random() * 3, 0.6)), depth: false }), v, vida: 18 + Math.random() * 8, edat: -1 - Math.random() * 1.5, de: 6, a: 13, op: 0.5, frega: 0.05, fum: true });
+    }
+    for (let i = 0; i < 90 * pq; i++) {
       const v = new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, Math.random()).normalize().multiplyScalar(9 + Math.random() * 20);
       parts.push({ s: sprite(textures.espurna, { suma: true, color: new THREE.Color(0xffc060), op: 1, mida: 0.22, p: o.clone().setZ(1), depth: false }), v, vida: 0.8 + Math.random() * 2.2, edat: 0, de: 0.26, a: 0.06, op: 1, frega: 0.9, g: 9 });
     }
@@ -333,13 +521,50 @@ export function creaEscena(canvas, senseMoviment) {
   requestAnimationFrame(pas);
 
   return {
-    construeix, explota, camera, THREE,
+    construeix, explota, camera, THREE, arma, celebra, avisaError,
     posaEstat(e) { estat = e; },
     intensitat(i) { intensitat = i; },
     salvada() {
-      estat = 'salvada';
-      alarmes.forEach((l) => { l.intensity = 0; });
+      estat = 'salvada'; salvadaT = performance.now();
+      if (vista.timer) vista.timer.userData.verd = true;
     },
+    // Portada: la càmera respira i es dibuixa a 30 fps. En sortir-ne, la càmera ve des de més lluny i amb un arc.
+    portada(v) {
+      const abans = portada; portada = Boolean(v);
+      if (abans && !portada && !senseMoviment) { entrada = 0; entradaMs = 1600; entradaArc = 0.9; temps0 = performance.now(); }
+    },
+    // Ampliar zones al mòbil: cada zona és un rectangle sobre un objecte (un mòdul, una part de la capçalera).
+    zona(el, obj, x, y, w, h) {
+      const cara = caraDe(obj);
+      el.dataset.cara = cara; el.dataset.amagada = String(G.girant || cara !== G.cara);
+      const d = { obj, x, y, w, h, z: 0.05, cara };
+      dianes.set(el, d); zones.set(el, d);
+    },
+    amplia(el) {
+      if (Z.zona === el) return;
+      Z.de = Z.ara.clone(); Z.deMira = Z.mira.clone(); Z.t0 = performance.now(); Z.zona = el; canvas.dataset.quieta = 'false';
+    },
+    allunya() {
+      if (!Z.zona) return;
+      Z.de = Z.ara.clone(); Z.deMira = Z.mira.clone(); Z.t0 = performance.now(); Z.zona = null; canvas.dataset.quieta = 'false';
+    },
+    get ampliada() { return Z.zona; },
+    get cares() { return cares; },
+    // Rendiment: el que mostra l'indicador ocult (Ctrl + Alt + D).
+    rendiment() {
+      const gl = renderer.getContext(); let gpu = '';
+      try { const x = gl.getExtension('WEBGL_debug_renderer_info'); gpu = x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (e) { gpu = '?'; }
+      return { ...ultimaMesura, grao: grao(), nomGrao: GRAONS[grao()].nom, forcat: graoForcat !== null, crides: renderer.info.render.calls, triangles: renderer.info.render.triangles, gpu, mida: `${renderer.domElement.width}×${renderer.domElement.height}` };
+    },
+    // Per a les proves: dibuixa i llegeix el color de la pantalla en uns quants punts (coordenades CSS).
+    llegeixColors(punts) {
+      renderer.render(scene, camera);
+      const gl = renderer.getContext(); const k = renderer.getPixelRatio(); const h = renderer.domElement.height;
+      const px = new Uint8Array(4);
+      return punts.map(([x, y]) => { gl.readPixels(Math.round(x * k), Math.round(h - y * k), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return [px[0], px[1], px[2]]; });
+    },
+    forcaGrao(n) { graoForcat = n === null || n === undefined ? null : Math.max(0, Math.min(GRAONS.length - 1, n)); aplicaGrao(); },
+    GRAONS: GRAONS.map((g) => g.nom),
     diana(el, obj, x, y, w, h, z = 0.2) {
       const cara = caraDe(obj);
       el.dataset.cara = cara; el.dataset.amagada = String(G.girant || cara !== G.cara);
@@ -464,15 +689,17 @@ export function creaEscena(canvas, senseMoviment) {
     const XF = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
     const llum = c.getContext('2d');
     m.userData.dibuixa = (text, vermell) => {
-      const color = vermell ? '#ff2a14' : '#ffae12';
-      const fantasma = vermell ? '#2c0a05' : '#2a1d08';
+      // Desactivada: el visor es queda fix i en verd.
+      const verd = m.userData.verd;
+      const color = verd ? '#35ff77' : vermell ? '#ff2a14' : '#ffae12';
+      const fantasma = verd ? '#062a10' : vermell ? '#2c0a05' : '#2a1d08';
       llum.fillStyle = '#080604'; llum.fillRect(0, 0, c.width, c.height);
       const [mm, ss] = text.split(':');
       const xifres = [mm.slice(-1), ss[0], ss[1]];
       const pos = [50, 225, 375]; const esc = 2.14;
       xifres.forEach((x, i) => {
         Object.entries(SEG).forEach(([k, pts]) => {
-          const on = (x === '-' ? 'g' : XF[Number(x)]).includes(k); // «-»: el visor en espera de la portada
+          const on = (x === '-' ? 'g' : x === ' ' ? '' : XF[Number(x)]).includes(k); // «-»: el visor en espera de la portada; « »: apagat
           llum.fillStyle = on ? color : fantasma;
           llum.shadowColor = on ? color : 'transparent'; llum.shadowBlur = on ? 18 : 0;
           llum.beginPath();

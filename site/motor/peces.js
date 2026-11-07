@@ -22,13 +22,37 @@ function soroll(mida, base, varia, ratlles) {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
+// Acer raspallat: ratlles fines horitzontals, amb alguna rascada que agafa la llum dura.
+function raspallat(mida) {
+  const c = document.createElement('canvas'); c.width = c.height = mida;
+  const x = c.getContext('2d');
+  for (let y = 0; y < mida; y++) {
+    const v = 128 + (Math.random() - 0.5) * 70;
+    x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(0, y, mida, 1);
+  }
+  for (let i = 0; i < mida * 3; i++) {
+    const v = Math.random() < 0.5 ? 255 : 0;
+    x.fillStyle = `rgba(${v},${v},${v},${0.05 + Math.random() * 0.12})`;
+    x.fillRect(Math.random() * mida, Math.random() * mida, 20 + Math.random() * 140, 1);
+  }
+  for (let i = 0; i < 70; i++) {
+    x.strokeStyle = `rgba(255,255,255,${0.05 + Math.random() * 0.15})`; x.lineWidth = 0.6 + Math.random();
+    x.beginPath(); const a = Math.random() * mida; const b = Math.random() * mida;
+    x.moveTo(a, b); x.lineTo(a + (Math.random() - 0.5) * 120, b + (Math.random() - 0.5) * 60); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
 export function materials() {
   if (M) return M;
   const r = soroll(512, 150, 60, 420); r.repeat.set(3, 2);
+  const rr = raspallat(512); rr.repeat.set(2, 3);
   const rp = soroll(256, 95, 80, 60); rp.repeat.set(9, 6);
   M = {
-    acer: new THREE.MeshStandardMaterial({ color: 0x3a3e41, metalness: 0.82, roughness: 0.62, roughnessMap: r, bumpMap: r, bumpScale: 0.35 }),
-    acerFosc: new THREE.MeshStandardMaterial({ color: 0x16181a, metalness: 0.7, roughness: 0.55 }),
+    // Blindatge: acer fosc raspallat. Les arestes bisellades del buc agafen la llum i retallen la silueta.
+    acer: new THREE.MeshStandardMaterial({ color: 0x33373a, metalness: 0.86, roughness: 0.58, roughnessMap: rr, bumpMap: rr, bumpScale: 0.22 }),
+    // Marcs dels mòduls: fosc i mat, perquè els colors de dins destaquin per contrast.
+    acerFosc: new THREE.MeshStandardMaterial({ color: 0x121416, metalness: 0.55, roughness: 0.72 }),
     alumini: new THREE.MeshStandardMaterial({ color: 0xa9aba6, metalness: 0.2, roughness: 0.78, bumpMap: r, bumpScale: 0.1 }),
     tapa: new THREE.MeshStandardMaterial({ color: 0x2a2d2f, metalness: 0.85, roughness: 0.55, roughnessMap: r, bumpMap: r, bumpScale: 0.3 }),
     banda: new THREE.MeshStandardMaterial({ color: 0x1d1f21, metalness: 0.3, roughness: 0.82, bumpMap: r, bumpScale: 0.15 }),
@@ -36,7 +60,7 @@ export function materials() {
     llauto: new THREE.MeshStandardMaterial({ color: 0x9c7a34, metalness: 0.75, roughness: 0.55, bumpMap: r, bumpScale: 0.06 }),
     pila: new THREE.MeshStandardMaterial({ color: 0x121213, metalness: 0.5, roughness: 0.38 }),
     coure: new THREE.MeshStandardMaterial({ color: 0xc77c3a, metalness: 1, roughness: 0.32 }),
-    paret: new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: 0.96, bumpMap: rp, bumpScale: 0.8 }),
+    paret: new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.96, bumpMap: rp, bumpScale: 0.8 }),
   };
   return M;
 }

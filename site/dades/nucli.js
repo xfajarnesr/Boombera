@@ -4,13 +4,20 @@
 var BoomberaNucli = (function () {
   var MEMBRES = { min: 2, max: 4 };
   var LLARGADA = { equip: 24, membre: 20 };
-  var COLUMNES = {
-    equips: ['id', 'nom', 'clau', 'membres', 'creat', 'agent', 'guia'],
-    partides: ['id', 'data', 'equip', 'nom_equip', 'missio', 'guanyada', 'errors', 'marge', 'agent', 'guia', 'versio'],
-  };
-  // Els codis de les 24 missions (secció.missió). Una prova comprova que coincideixen amb les regles.
+  // Els codis de les 24 missions (secció.missió) i els mòduls. Una prova comprova que coincideixen amb les regles.
   var CODIS = [];
   for (var s = 1; s <= 6; s++) for (var m = 1; m <= 4; m++) CODIS.push(s + '.' + m);
+  var MODULS = ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'];
+  // Detall per mòdul: quants errors s'hi han fet i quan s'ha resolt (segons des del començament).
+  var PER_MODUL = [];
+  MODULS.forEach(function (x) { PER_MODUL.push('e_' + x); });
+  MODULS.forEach(function (x) { PER_MODUL.push('t_' + x); });
+  var COLUMNES = {
+    equips: ['id', 'nom', 'clau', 'membres', 'creat', 'agent', 'guia'],
+    partides: ['id', 'data', 'equip', 'nom_equip', 'missio', 'guanyada', 'errors', 'marge', 'agent', 'guia', 'versio', 'estat', 'seq'].concat(PER_MODUL),
+    // Altres partides: sense equip (es juga «sense desar») i missions lliures. No compten per al progrés ni per als millors.
+    altres: ['id', 'data', 'equip', 'nom_equip', 'missio', 'moduls', 'segons', 'max_errors', 'estat', 'errors', 'marge', 'versio', 'seq'].concat(PER_MODUL),
+  };
 
   // «Tigres Àgils», «tigres  agils» i «TIGRES ÀGILS» són el mateix equip.
   function normalitza(text) {
@@ -82,27 +89,63 @@ var BoomberaNucli = (function () {
     e.membres = membres;
     return { ok: true, equip: vista(db, e), canvis: { equips: 'tot' } };
   }
+  var enter = function (v, min, max) { var n = Math.round(Number(v)); return n >= min && n <= max ? n : null; };
+  // Estat de la partida: guanyada, perduda o abandonada (s'ha tancat la pestanya a mitja bomba).
+  function estatDe(p) {
+    if (p.guanyada) return 'guanyada';
+    return p.estat === 'abandonada' ? 'abandonada' : 'perduda';
+  }
+  // El detall per mòdul arriba com { errors: { cables: 1 }, temps: { cables: 40 }, seq: '…' } i es desa en columnes.
+  function detall(fila, d) {
+    d = d || {};
+    MODULS.forEach(function (x) {
+      var e = d.errors && enter(d.errors[x], 0, 3); var t = d.temps && enter(d.temps[x], 0, 599);
+      fila['e_' + x] = e === null || e === undefined ? '' : e;
+      fila['t_' + x] = t === null || t === undefined ? '' : t;
+    });
+    fila.seq = neteja(d.seq).slice(0, 500);
+  }
   // Les partides porten un identificador fet al navegador: si una s'envia dues vegades (per una connexió que cau), només compta una.
   function desaPartides(db, q, ctx) {
-    var noves = []; var equips = {};
-    var fetes = {}; db.partides.forEach(function (p) { fetes[p.id] = true; });
+    if (!db.altres) db.altres = [];
+    var noves = []; var altres = [];
+    var fetes = {}; db.partides.concat(db.altres).forEach(function (p) { fetes[p.id] = true; });
     (q.partides || []).forEach(function (p) {
+      if (!p || !p.id || fetes[p.id]) return;
+      var errors = enter(p.errors, 0, 3); var marge = enter(p.marge, 0, 599);
+      if (errors === null || marge === null) return;
+      var estat = estatDe(p);
       var e = troba(db, p.equip);
-      if (!e || !p.id || fetes[p.id] || CODIS.indexOf(p.missio) < 0) return;
-      var errors = Math.round(Number(p.errors)); var marge = Math.round(Number(p.marge));
-      if (!(errors >= 0 && errors <= 3 && marge >= 0 && marge <= 599)) return;
+      if (p.altra) {
+        var moduls = String(p.moduls || '').split(/[ ,]+/).filter(function (x) { return MODULS.indexOf(x.replace(/-2$/, '')) >= 0; }).slice(0, 12);
+        var missio = CODIS.indexOf(p.missio) >= 0 ? p.missio : 'lliure';
+        if (!moduls.length) return;
+        var a = {
+          id: String(p.id).slice(0, 40), data: neteja(p.data) || ctx.ara, equip: e ? e.id : '', nom_equip: e ? e.nom : '', missio: missio,
+          moduls: moduls.join(' '), segons: enter(p.segons, 30, 599) || '', max_errors: enter(p.max_errors, 1, 3) || '',
+          estat: estat, errors: errors, marge: estat === 'guanyada' ? marge : 0, versio: Number(p.versio) || 0,
+        };
+        detall(a, p.detall);
+        fetes[a.id] = true; db.altres.push(a); altres.push(a);
+        return;
+      }
+      if (!e || CODIS.indexOf(p.missio) < 0) return;
       var fila = {
         id: String(p.id).slice(0, 40), data: neteja(p.data) || ctx.ara, equip: e.id, nom_equip: e.nom, missio: p.missio,
-        guanyada: Boolean(p.guanyada), errors: errors, marge: p.guanyada ? marge : 0,
+        guanyada: estat === 'guanyada', errors: errors, marge: estat === 'guanyada' ? marge : 0,
         agent: neteja(p.agent).slice(0, LLARGADA.membre), guia: neteja(p.guia).slice(0, LLARGADA.membre), versio: Number(p.versio) || 0,
+        estat: estat,
       };
+      detall(fila, p.detall);
       fetes[fila.id] = true; db.partides.push(fila); noves.push(fila);
-      e.agent = fila.agent; e.guia = fila.guia; equips[e.id] = true;
+      e.agent = fila.agent; e.guia = fila.guia;
     });
-    var r = { ok: true, desades: (q.partides || []).map(function (p) { return p.id; }) };
+    var r = { ok: true, desades: (q.partides || []).map(function (p) { return p && p.id; }) };
     var e = troba(db, q.equip);
     if (e) r.equip = vista(db, e);
-    if (noves.length) r.canvis = { equips: 'tot', partides: noves };
+    if (noves.length || altres.length) r.canvis = {};
+    if (noves.length) { r.canvis.equips = 'tot'; r.canvis.partides = noves; }
+    if (altres.length) r.canvis.altres = altres;
     return r;
   }
 
@@ -117,13 +160,17 @@ var BoomberaNucli = (function () {
         return v;
       }),
       partides: db.partides.slice(),
+      altres: (db.altres || []).slice(),
     };
   }
   function esborraEquip(db, q) {
     if (!troba(db, q.equip)) return { ok: false, error: 'no-existeix' };
     db.equips = db.equips.filter(function (e) { return e.id !== q.equip; });
     db.partides = db.partides.filter(function (p) { return p.equip !== q.equip; });
-    return { ok: true, canvis: { equips: 'tot', partides: 'tot' } };
+    // Les altres partides de l'equip es queden, però sense el nom.
+    var c = { equips: 'tot', partides: 'tot' };
+    (db.altres || []).forEach(function (p) { if (p.equip === q.equip) { p.equip = ''; p.nom_equip = ''; c.altres = 'tot'; } });
+    return { ok: true, canvis: c };
   }
   function esborraPartida(db, q) {
     var n = db.partides.length;
@@ -135,9 +182,12 @@ var BoomberaNucli = (function () {
     var de = troba(db, q.de); var a = troba(db, q.a);
     if (!de || !a || de === a) return { ok: false, error: 'no-existeix' };
     db.partides.forEach(function (p) { if (p.equip === de.id) { p.equip = a.id; p.nom_equip = a.nom; } });
+    var altresCanvien = false;
+    (db.altres || []).forEach(function (p) { if (p.equip === de.id) { p.equip = a.id; p.nom_equip = a.nom; altresCanvien = true; } });
     a.membres = validaMembres(a.membres.concat(de.membres));
     db.equips = db.equips.filter(function (e) { return e !== de; });
-    return { ok: true, equip: vista(db, a), canvis: { equips: 'tot', partides: 'tot' } };
+    var c = { equips: 'tot', partides: 'tot' }; if (altresCanvien) c.altres = 'tot';
+    return { ok: true, equip: vista(db, a), canvis: c };
   }
 
   var ACCIONS = { creaEquip: creaEquip, recuperaEquip: recuperaEquip, afegeixMembre: afegeixMembre, desaPartides: desaPartides };
@@ -152,6 +202,6 @@ var BoomberaNucli = (function () {
     return { ok: false, error: 'accio' };
   }
 
-  return { executa: executa, normalitza: normalitza, millor: millor, millors: millors, CODIS: CODIS, COLUMNES: COLUMNES, MEMBRES: MEMBRES, LLARGADA: LLARGADA };
+  return { executa: executa, normalitza: normalitza, millor: millor, millors: millors, CODIS: CODIS, MODULS: MODULS, COLUMNES: COLUMNES, MEMBRES: MEMBRES, LLARGADA: LLARGADA };
 })();
 if (typeof module !== 'undefined') module.exports = BoomberaNucli;

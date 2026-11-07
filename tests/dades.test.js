@@ -70,7 +70,8 @@ assert.strictEqual(creaGoogle({ clau: null }).crida({ accio: 'tauler', clau: '' 
 const lleons = crida({ accio: 'creaEquip', nom: '=HYPERLINK("x")', membres: ['A', 'B'] }).equip.id;
 assert(g.pestanyes.Equips.cel.some((f) => f[1] === '=HYPERLINK("x")'), "el nom es guarda tal qual, com a text (amb l'apòstrof, el full no el llegeix com a fórmula)");
 const fp = g.files('Partides');
-assert.deepStrictEqual(fp[0], ['Id', 'Data', 'Id equip', 'Equip', 'Missió', 'Guanyada', 'Errors', 'Marge (s)', 'Agent', 'Guia', 'Versió regles']);
+assert.deepStrictEqual(fp[0].slice(0, 14), ['Id', 'Data', 'Id equip', 'Equip', 'Missió', 'Guanyada', 'Errors', 'Marge (s)', 'Agent', 'Guia', 'Versió regles', 'Estat', 'Seqüència', 'Errors cables']);
+assert.strictEqual(fp[0].length, N.COLUMNES.partides.length);
 assert.strictEqual(fp[1][4], '1.1');
 const millors = g.files('Millors');
 assert.deepStrictEqual(millors[0].slice(0, 4), ['Equip', 'Membres', 'Superades', '1.1']);
@@ -97,6 +98,52 @@ const e2 = g2.crida({ accio: 'creaEquip', nom: 'Molts', membres: ['A', 'B'] }).e
 g2.crida({ accio: 'desaPartides', equip: e2, partides: Array.from({ length: 1200 }, (_, i) => ({ id: `m${i}`, equip: e2, missio: '1.1', guanyada: i % 2 === 0, errors: 1, marge: i % 300 })) });
 assert.strictEqual(g2.files('Partides').length, 1201);
 assert.deepStrictEqual(g2.crida({ accio: 'recuperaEquip', nom: 'molts' }).equip.millors['1.1'], { errors: 1, marge: 298 });
+
+// Detall per mòdul, partides abandonades i altres partides (sense equip i missions lliures).
+assert.deepStrictEqual(N.MODULS, R.MODULS, 'el nucli coneix els mateixos mòduls que les regles');
+const g3 = creaGoogle();
+const e3 = g3.crida({ accio: 'creaEquip', nom: 'Detall', membres: ['A', 'B'] }).equip.id;
+const det = { errors: { cables: 2, boto: 1, inventat: 3 }, temps: { cables: 95, boto: 700 }, seq: 'error cables 0:12 · fet cables 1:35' };
+r = g3.crida({ accio: 'desaPartides', equip: e3, partides: [
+  { id: 'd1', equip: e3, missio: '1.4', guanyada: true, errors: 2, marge: 40, detall: det },
+  { id: 'd2', equip: e3, missio: '1.2', guanyada: false, estat: 'abandonada', errors: 0, marge: 80 },
+  { id: 'd3', altra: true, missio: 'lliure', moduls: 'cables morse', segons: 300, max_errors: 2, guanyada: false, errors: 2, marge: 0, detall: { errors: { morse: 2 } } },
+  { id: 'd4', altra: true, equip: e3, missio: '2.1', moduls: 'sequencia cables', segons: 210, max_errors: 3, guanyada: true, errors: 0, marge: 33 },
+  { id: 'd5', altra: true, moduls: 'res', errors: 0, marge: 0 },
+  { id: 'd1', equip: e3, missio: '1.4', guanyada: true, errors: 0, marge: 99 },
+] });
+assert(r.ok && r.desades.length === 6, 'totes surten de la cua');
+const cols = N.COLUMNES.partides; const fd = g3.files('Partides');
+const fila = (f, id) => f.find((x) => x[0] === id);
+const camp = (f, c) => f[cols.indexOf(c)];
+assert.strictEqual(fd.length, 3, 'dues partides de l\'equip (la repetida no compta)');
+assert.strictEqual(camp(fila(fd, 'd1'), 'e_cables'), 2); assert.strictEqual(camp(fila(fd, 'd1'), 'e_boto'), 1);
+assert.strictEqual(camp(fila(fd, 'd1'), 't_cables'), 95); assert.strictEqual(camp(fila(fd, 'd1'), 't_boto'), '', 'un temps impossible no es desa');
+assert.strictEqual(camp(fila(fd, 'd1'), 'seq'), det.seq);
+assert.strictEqual(camp(fila(fd, 'd1'), 'estat'), 'guanyada');
+assert.strictEqual(camp(fila(fd, 'd2'), 'estat'), 'abandonada'); assert.strictEqual(camp(fila(fd, 'd2'), 'marge'), 0);
+const ca = N.COLUMNES.altres; const fa = g3.files('Altres partides');
+assert.strictEqual(fa.length, 3, 'dues altres partides (una sense mòduls vàlids no compta)');
+assert.strictEqual(fa[0][ca.indexOf('missio')], 'Missió');
+const d3 = fila(fa, 'd3'); const d4 = fila(fa, 'd4');
+assert.strictEqual(d3[ca.indexOf('missio')], 'lliure'); assert.strictEqual(d3[ca.indexOf('moduls')], 'cables morse'); assert.strictEqual(d3[ca.indexOf('equip')], '');
+assert.strictEqual(d3[ca.indexOf('e_morse')], 2); assert.strictEqual(d3[ca.indexOf('estat')], 'perduda');
+assert.strictEqual(d4[ca.indexOf('nom_equip')], 'Detall'); assert.strictEqual(d4[ca.indexOf('missio')], '2.1');
+assert.deepStrictEqual(g3.crida({ accio: 'recuperaEquip', nom: 'Detall' }).equip.millors, { 1.4: { errors: 2, marge: 40 } }, 'les altres partides no compten per als millors');
+assert.strictEqual(g3.crida({ accio: 'tauler', clau: 'clau-de-prova' }).altres.length, 2);
+// Esborrar l'equip deixa les seves altres partides, però sense el nom.
+g3.crida({ accio: 'esborraEquip', equip: e3, clau: 'clau-de-prova' });
+assert.strictEqual(fila(g3.files('Altres partides'), 'd4')[ca.indexOf('nom_equip')], '');
+// Un full d'abans: la capçalera de Partides s'amplia sola i les files velles es continuen llegint.
+const g4 = creaGoogle();
+const e4 = g4.crida({ accio: 'creaEquip', nom: 'Vell', membres: ['A', 'B'] }).equip.id;
+const pv = g4.pestanyes.Partides.cel;
+pv[0] = pv[0].slice(0, 11);
+pv[1] = ['v1', '2026-11-06T10:00:00Z', e4, 'Vell', '1.1', true, 1, 50, 'A', 'B', 9];
+r = g4.crida({ accio: 'desaPartides', equip: e4, partides: [{ id: 'v2', equip: e4, missio: '1.2', guanyada: true, errors: 0, marge: 20 }] });
+assert.strictEqual(g4.files('Partides')[0].length, N.COLUMNES.partides.length, 'la capçalera té les columnes noves');
+assert.deepStrictEqual(r.equip.millors, { 1.1: { errors: 1, marge: 50 }, 1.2: { errors: 0, marge: 20 } });
+console.log('Dades noves: detall per mòdul, partides abandonades i «Altres partides» (sense equip i lliures), que no compten per al progrés. Un full antic s\'amplia sol.');
 console.log("Apps Script: equips sense repetits (ni per majúscules ni accents), partides sense duplicats, millors, tauler amb clau, fusionar i esborrar.");
 
 // apps-script/Codi.gs és al dia: és el que s'enganxa al full.

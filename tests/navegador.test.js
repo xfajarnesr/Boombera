@@ -48,7 +48,8 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
     // Mentre es llegeix, el rellotge de la pàgina està aturat: el temps surt exacte encara que la màquina vagi lenta.
     await r.evaluate(() => window.__atura());
     await prem(`.nivell[data-nivell="${n}"]`);
-    await r.waitForFunction(() => document.body.dataset.fase === 'joc', null, POLL);
+    // Amb el rellotge aturat, la bomba es queda armant-se: les dades ja hi són.
+    await r.waitForFunction(() => document.body.dataset.fase === 'armant', null, POLL);
     const v = await r.evaluate(() => ({
       missio: { ...document.querySelector('#missio').dataset },
       espais: [...document.querySelectorAll('#espais li')].map((l) => ({ id: l.dataset.modul, cara: Number(l.dataset.cara) })),
@@ -67,7 +68,9 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
     assert.strictEqual(v.temps, m.segons, `${m.nom}: temps`);
     assert.strictEqual(v.errors, `0 de ${m.errors}`, `${m.nom}: errors`);
     assert.strictEqual(v.max, m.errors);
-    await r.evaluate(() => { window.__segueix(); window.__salta(1200000); });
+    await r.evaluate(() => window.__segueix());
+    await r.waitForFunction(() => document.body.dataset.fase === 'joc', null, POLL);
+    await r.evaluate(() => window.__salta(1200000));
     await r.waitForFunction(() => document.body.dataset.fase === 'petada', null, { ...POLL, timeout: 30000 });
   }
   await r.waitForFunction(() => !document.querySelector('#nota').hidden, null, POLL);
@@ -100,6 +103,25 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   await ctxR.close();
   console.log(`Les ${R.NIVELLS.length} missions porten els mòduls, el temps i els errors que diuen. La missió lliure es configura i es comparteix per enllaç.`);
 
+  // Abans del compte enrere, la bomba s'arma: mentre dura, el rellotge no compta i no es pot girar.
+  {
+    const n = idx('1.1');
+    await p.waitForSelector('.nivell'); await fotogrames(p);
+    await p.evaluate(() => window.__atura());
+    await p.click(`.nivell[data-nivell="${n}"]`);
+    await p.waitForFunction(() => document.body.dataset.fase === 'armant');
+    assert.strictEqual(await total(p), R.NIVELLS[n].segons, "durant l'armat el rellotge no compta");
+    assert.strictEqual(await p.locator('#gira').isVisible(), false);
+    assert.strictEqual(await p.evaluate(() => document.querySelector('#escena').dataset.quieta), 'false');
+    await p.evaluate(() => window.__segueix());
+    await p.waitForFunction(() => document.body.dataset.fase === 'joc');
+    await quieta(p);
+    assert(await total(p) >= R.NIVELLS[n].segons - 2, 'el compte enrere comença en acabar l\'armat');
+    await p.evaluate(() => { window.__salta(600000); });
+    await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
+    console.log("Armat: la bomba s'arma abans del compte enrere, i mentrestant el rellotge no compta.");
+  }
+
   // Es juga sencera una missió de cada secció, sense errors. A la secció 1, amb dos mòduls iguals.
   const JUGA = ['1.4', '2.4', '3.4', '4.4', '5.4', '6.3'];
   for (const codi of JUGA) {
@@ -126,6 +148,8 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
     }
     await p.waitForFunction(() => document.body.dataset.fase === 'salvada', null, { timeout: 30000 });
     assert.strictEqual(await fusibles(p), 0);
+    assert.strictEqual(await p.textContent('#segell'), 'Desactivada');
+    assert.strictEqual(await p.locator('#segell').isVisible(), true, 'en desactivar-la surt el segell');
   }
   await pausaCaptura(p, 400);
   await captura(p, 'guanya');
@@ -393,6 +417,8 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   await veu(p, 'cables');
   const dolent = b.cables.findIndex((_, i) => i !== R.solucioCables(b));
   const t0 = await total(p);
+  // Rellotge aturat: així es pot llegir la tensió just després de l'error, encara que la màquina vagi lenta.
+  await p.evaluate(() => window.__atura());
   await p.locator(`.cable[data-i="${dolent}"]`).click();
   const t1 = await total(p);
   assert.strictEqual(await fusibles(p), 1);
@@ -400,6 +426,15 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   assert.strictEqual(await fet(p, 'cables'), false);
   await captura(p, 'error');
   console.log(`Un error resta ${t0 - t1} s.`);
+  // Amb marge, la tensió puja uns segons i després torna gairebé on era; no entra la capa de l'últim error.
+  const tensio = () => p.evaluate(() => ({ t: Number(document.querySelector('#temps').dataset.tensio), ultim: document.querySelector('#temps').dataset.ultim, tic: Number(document.querySelector('#temps').dataset.tic) }));
+  const desDe = async (tic) => { await p.waitForFunction((n) => Number(document.querySelector('#temps').dataset.tic) > n + 1, tic); return tensio(); };
+  const just = await desDe((await tensio()).tic);
+  assert.strictEqual(just.ultim, 'false', 'amb dos errors de marge no és l\'últim');
+  await p.evaluate(() => { window.__segueix(); window.__salta(6000); });
+  const despres = await desDe(just.tic);
+  assert(despres.t < just.t - 0.1, `la tensió torna a baixar després d'un error: ${just.t} → ${despres.t}`);
+  console.log(`Tensió: després d'un error amb marge, ${just.t.toFixed(2)} i 6 s més tard ${despres.t.toFixed(2)}.`);
 
   // Fer el contrari del que toca al botó és error.
   await veu(p, 'boto');
@@ -411,6 +446,8 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   } else await proves.boto.clicSec(p);
   await p.waitForFunction(() => Number(document.querySelector('#errors').dataset.n) === 2);
   assert.strictEqual(await fet(p, 'boto'), false);
+  // Ara només queda un error: entra la capa de l'últim error, i s'hi queda.
+  await p.waitForFunction(() => document.querySelector('#temps').dataset.ultim === 'true');
   console.log("Fer l'acció contrària al botó és error.");
 
   // Tercer error: explota.
@@ -433,12 +470,35 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
 
   // Quan queda poc temps tot es torna vermell, i a 0:00 peta.
   await nivell(p, CB);
+  // Els colors dels cables s'han de distingir encara que l'alarma ho tenyeixi tot de vermell:
+  // es llegeix el color de la pantalla al mig de cada cable, sense alarma i amb l'alarma al màxim.
+  await veu(p, 'cables');
+  const colorsCables = async () => {
+    const cs = await p.evaluate(() => [...document.querySelectorAll('[data-instancia="cables"] .cable')].map((c) => {
+      const r = c.getBoundingClientRect(); return { color: c.dataset.color, x: r.x + r.width / 2, y: r.y + r.height * 0.45 };
+    }));
+    const px = await p.evaluate((pts) => window.__esc.llegeixColors(pts), cs.map((c) => [c.x, c.y]));
+    return cs.map((c, i) => ({ color: c.color, rgb: px[i] }));
+  };
+  const separacio = (llista) => {
+    let min = Infinity;
+    llista.forEach((a) => llista.forEach((b) => { if (a.color !== b.color) min = Math.min(min, Math.hypot(...a.rgb.map((v, k) => v - b.rgb[k]))); }));
+    return min;
+  };
+  const calma = await colorsCables();
   await p.evaluate((d) => { window.__ms = 0; window.__salta((d - 12) * 1000); }, R.NIVELLS[CB].segons);
   await p.waitForFunction(() => Number(document.querySelector('#temps').dataset.total) <= 12, null, { timeout: 15000 })
     .catch(() => assert.fail('el salt de temps'));
   // Amb el rellotge aturat, perquè a una màquina lenta no arribi a 0:00 abans de comprovar l'alarma.
   await p.evaluate(() => window.__atura());
   await captura(p, 'tensio');
+  await p.waitForFunction(() => Number(document.querySelector('#temps').dataset.tensio) > 0.9, null, { timeout: 15000 });
+  const alarma = await colorsCables();
+  const [sc, sa] = [separacio(calma), separacio(alarma)];
+  if (sc < Infinity) {
+    assert(sa >= 40 && sa >= sc * 0.5, `amb l'alarma, els colors dels cables es confonen: ${sa.toFixed(0)} (sense alarma ${sc.toFixed(0)}) ${JSON.stringify(alarma)}`);
+    console.log(`Colors dels cables: separació mínima ${sc.toFixed(0)} sense alarma i ${sa.toFixed(0)} amb l'alarma al màxim.`);
+  }
   // Espera el canvi de color, perquè les màquines lentes poden trigar uns quants fotogrames.
   await p.waitForFunction(() => Number(getComputedStyle(document.documentElement).getPropertyValue('--alarma')) > 0, null, { timeout: 15000 })
     .catch(async () => assert.fail(`alarma activa: ${JSON.stringify(await p.evaluate(() => ({ fase: document.body.dataset.fase, alarma: getComputedStyle(document.documentElement).getPropertyValue('--alarma'), temps: document.querySelector('#temps').dataset.total, ms: window.__ms })))}`));
@@ -475,15 +535,26 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   assert.strictEqual(await p.title(), 'Boombera');
   assert.strictEqual(await p.locator('#so svg').count(), 1);
   assert.strictEqual(await p.locator('#pantalla svg').count(), 1);
-  assert.strictEqual(await p.locator('#gira svg').count(), 1);
-  assert.strictEqual((await p.textContent('#gira')).trim(), '', 'el botó de girar no porta text');
-  const etSo = await p.getAttribute('#so', 'aria-label');
-  await p.locator('#so').dispatchEvent('click');
-  await p.waitForFunction((e) => document.querySelector('#so').getAttribute('aria-label') !== e, etSo);
-  await p.locator('#so').dispatchEvent('click');
-  await p.waitForFunction((e) => document.querySelector('#so').getAttribute('aria-label') === e, etSo);
+  // La barra de girar, a sota: «Davant · Darrere», amb la cara que es veu marcada.
+  assert.deepStrictEqual(await p.locator('#gira .cara').allTextContents(), ['Davant', 'Darrere']);
+  const marcada = () => p.evaluate(() => getComputedStyle(document.querySelector(`#gira .cara[data-c="${document.body.dataset.cara}"]`)).backgroundColor);
+  const noMarcada = () => p.evaluate(() => getComputedStyle(document.querySelector(`#gira .cara[data-c="${1 - Number(document.body.dataset.cara)}"]`)).backgroundColor);
+  assert.notStrictEqual(await marcada(), await noMarcada(), 'la cara que es veu està marcada');
+  const gb = await p.locator('#gira').boundingBox(); const vp = p.viewportSize();
+  assert(gb.y + gb.height > vp.height * 0.85 && Math.abs(gb.x + gb.width / 2 - vp.width / 2) < 30, 'la barra de girar és a sota, al centre');
+  // Dos interruptors de so: la música de tensió i els sons dels botons, cada un pel seu compte.
+  for (const id of ['#so', '#musica']) {
+    const altre = id === '#so' ? '#musica' : '#so';
+    const et = await p.getAttribute(id, 'aria-label'); const etAltre = await p.getAttribute(altre, 'aria-label');
+    await p.locator(id).dispatchEvent('click');
+    await p.waitForFunction(([x, e]) => document.querySelector(x).getAttribute('aria-label') !== e && document.querySelector(x).getAttribute('aria-pressed') === 'false', [id, et]);
+    assert.strictEqual(await p.getAttribute(altre, 'aria-label'), etAltre, "silenciar-ne un no toca l'altre");
+    await p.locator(id).dispatchEvent('click');
+    await p.waitForFunction(([x, e]) => document.querySelector(x).getAttribute('aria-label') === e, [id, et]);
+  }
+  assert.deepStrictEqual(await p.evaluate(() => [localStorage.getItem('boombera.so.musica'), localStorage.getItem('boombera.so.efectes')]), ['si', 'si']);
   assert(!(await p.textContent('body')).includes('Curtcircuit'), 'el nom antic no surt al joc');
-  console.log("Boombera: l'altaveu canvia d'estat i hi ha el botó de pantalla completa.");
+  console.log("Boombera: la música i els sons dels botons es silencien per separat, i hi ha la barra de girar a sota.");
 
   // El joc només enllaça el manual des de la portada (per a la Guia): fora de la portada no se'n veu cap enllaç.
   assert.deepStrictEqual(await p.evaluate(() => [...document.querySelectorAll('a[href*="manual"]')].map((a) => a.closest('#portada') ? a.id : 'fora')), ['portada-manual'], "el manual només s'enllaça des de la portada");

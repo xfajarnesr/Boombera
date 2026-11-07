@@ -8,6 +8,7 @@ const { creaGoogle } = require('./fals-google.js');
 
 const GOOGLE = 'https://script.google.com/macros/s/PROVA/exec';
 const CLAU = 'clau-de-prova';
+const COLUMNES_P = require('../site/dades/nucli.js').COLUMNES.partides;
 
 (async () => {
   await new Promise((ok) => servidor.listen(0, ok));
@@ -18,11 +19,11 @@ const CLAU = 'clau-de-prova';
   let caigut = false; let peticions = 0;
   const errs = [];
   // Cada context és un ordinador d'aula: el seu navegador, connectat al «full» de mentida.
-  async function ordinador({ remot = true, ms = 2000, reduit = false } = {}) {
+  async function ordinador({ remot = true, ms = 2000, reduit = false, registraTot = false } = {}) {
     const ctx = await nav.newContext({ viewport: CAPTURES ? { width: 1366, height: 768 } : { width: 960, height: 540 }, reducedMotion: reduit ? 'reduce' : 'no-preference', acceptDownloads: true, serviceWorkers: 'block' });
     await ctx.addInitScript(rellotge(ms) + saltaIntro);
     if (remot) {
-      await ctx.route('**/comu/config.js', (rt) => rt.fulfill({ contentType: 'text/javascript', body: `window.BOOMBERA_CONFIG = { servidor: '${GOOGLE}' };` }));
+      await ctx.route('**/comu/config.js', (rt) => rt.fulfill({ contentType: 'text/javascript', body: `window.BOOMBERA_CONFIG = { servidor: '${GOOGLE}', registraTot: ${registraTot} };` }));
       await ctx.route(`${GOOGLE}*`, (rt) => {
         if (caigut) return rt.abort('internetdisconnected');
         peticions++;
@@ -134,6 +135,12 @@ const CLAU = 'clau-de-prova';
   await espera(() => partides() === 1, 'la partida guanyada arriba al full');
   const fila = g.files('Partides')[1];
   assert.deepStrictEqual([fila[4], fila[5], fila[6], fila[8], fila[9], fila[10]], ['1.1', true, 0, 'Aina M.', 'Pau R.', R.VERSIO]);
+  // Detall per mòdul: quan s'ha resolt cada mòdul i la seqüència de la partida.
+  const COLS = require('../site/dades/nucli.js').COLUMNES.partides;
+  assert.strictEqual(fila[COLS.indexOf('estat')], 'guanyada');
+  assert(Number.isInteger(fila[COLS.indexOf('t_cables')]), `segon en què s'ha resolt: ${fila[COLS.indexOf('t_cables')]}`);
+  assert.strictEqual(fila[COLS.indexOf('e_cables')], 0);
+  assert(/fet cables .*fet cables-2|fet cables-2 .*fet cables/.test(fila[COLS.indexOf('seq')]), fila[COLS.indexOf('seq')]);
   const nota = await text(a, '#nota-text');
   assert(nota.includes('Missió superada!'), nota);
   // Amb tres persones, qui feia de guia passa a fer d'agent i la següent fa de guia.
@@ -228,6 +235,62 @@ const CLAU = 'clau-de-prova';
   await petaAra(bb);
   assert.strictEqual(peticions, n0, 'sense equip no es desa res');
   console.log("Sense connexió: la partida es queda a la cua i s'envia una sola vegada quan torna. Sense equip es juga sense desar.");
+
+  /* ---------- Els primers dies: també s'envien les partides sense equip, les lliures i les abandonades ---------- */
+  {
+    const altres = () => g.files('Altres partides').slice(1);
+    const CA = require('../site/dades/nucli.js').COLUMNES.altres;
+    const D = await ordinador({ registraTot: true });
+    const d = await pagina(D);
+    await panell(d, 'entra');
+    await d.locator('#sense-equip').click();
+    await panell(d, 'missions');
+    await fotogrames(d);
+    await d.locator('.nivell[data-codi="1.1"]').click();
+    await d.waitForFunction(() => document.body.dataset.fase === 'joc');
+    await quieta(d);
+    await petaAra(d);
+    await espera(() => altres().length === 1, 'la partida sense equip arriba a «Altres partides»');
+    let f = altres()[0];
+    assert.deepStrictEqual([f[CA.indexOf('equip')], f[CA.indexOf('missio')], f[CA.indexOf('moduls')], f[CA.indexOf('estat')], f[CA.indexOf('max_errors')]], ['', '1.1', 'cables cables-2', 'perduda', R.NIVELLS[0].errors]);
+    // Una missió lliure també hi va, amb els mòduls triats.
+    await d.locator('#obre-lliure').click();
+    await panell(d, 'lliure');
+    await d.locator('#lliure-moduls input[value="boto"]').check();
+    await d.locator('#comenca-lliure').click();
+    await d.waitForFunction(() => document.body.dataset.fase === 'joc');
+    await quieta(d);
+    await petaAra(d);
+    await espera(() => altres().length === 2, 'la missió lliure arriba a «Altres partides»');
+    f = altres()[1];
+    assert.deepStrictEqual([f[CA.indexOf('missio')], f[CA.indexOf('moduls')]], ['lliure', 'boto']);
+    // Si es tanca o es recarrega la pestanya a mitja bomba, la partida s'envia com a abandonada.
+    await panell(d, 'missions');
+    await fotogrames(d);
+    await d.locator('.nivell[data-codi="1.2"]').click();
+    await d.waitForFunction(() => document.body.dataset.fase === 'joc');
+    await d.reload({ waitUntil: 'domcontentloaded' });
+    await espera(() => altres().length === 3, 'la partida abandonada arriba a «Altres partides»');
+    f = altres()[2];
+    assert.deepStrictEqual([f[CA.indexOf('missio')], f[CA.indexOf('estat')]], ['1.2', 'abandonada']);
+    // Amb equip, l'abandonada va a Partides (no compta com a superada).
+    const n1 = partides();
+    // (L'adreça encara porta la missió lliure d'abans: es torna a l'adreça neta.)
+    await d.goto(url, { waitUntil: 'domcontentloaded' });
+    await panell(d, 'entra');
+    await d.locator('#pest-recupera').click();
+    await d.fill('#recupera-nom', 'tigres agils');
+    await d.locator('#recupera-equip button[type="submit"]').click();
+    await panell(d, 'missions');
+    await juga(d, '1.3');
+    await d.reload({ waitUntil: 'domcontentloaded' });
+    await espera(() => partides() === n1 + 1, 'la partida abandonada de l\'equip arriba a Partides');
+    const fa = g.files('Partides').slice(-1)[0];
+    assert.deepStrictEqual([fa[4], fa[5], fa[COLUMNES_P.indexOf('estat')]], ['1.3', false, 'abandonada']);
+    assert.strictEqual(altres().length, 3, 'la de l\'equip no va a «Altres partides»');
+    await D.close();
+    console.log('Primers dies (registraTot): les partides sense equip i les lliures van a «Altres partides», i les abandonades s\'envien en tancar la pestanya.');
+  }
 
   /* ---------- Codis ocults ---------- */
   await codi(bb, 'això no és res');

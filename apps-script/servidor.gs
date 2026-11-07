@@ -1,11 +1,16 @@
 /* ---------- Servidor de Boombera al full de càlcul ---------- */
-// Pestanyes: Equips i Partides (les dades), i Millors (la vista per al professorat, que es refà sola).
+// Pestanyes: Equips, Partides i Altres partides (les dades), i Millors (la vista per al professorat, que es refà sola).
+// Altres partides: les que es juguen sense equip i les missions lliures. No compten per al progrés.
 // La clau del professorat es posa des del menú Boombera del full: no és enlloc del codi.
 
-var PESTANYES = { equips: 'Equips', partides: 'Partides' };
+var PESTANYES = { equips: 'Equips', partides: 'Partides', altres: 'Altres partides' };
+// Detall per mòdul: errors fets a cada mòdul i segon en què s'ha resolt (comptant des del començament).
+var CAP_MODULS = BoomberaNucli.MODULS.map(function (m) { return 'Errors ' + m; })
+  .concat(BoomberaNucli.MODULS.map(function (m) { return 'Resolt ' + m + ' (s)'; }));
 var CAPCALERES = {
   equips: ['Id', 'Equip', 'Nom normalitzat', 'Membres', 'Creat', 'Darrer agent', 'Darrer guia'],
-  partides: ['Id', 'Data', 'Id equip', 'Equip', 'Missió', 'Guanyada', 'Errors', 'Marge (s)', 'Agent', 'Guia', 'Versió regles'],
+  partides: ['Id', 'Data', 'Id equip', 'Equip', 'Missió', 'Guanyada', 'Errors', 'Marge (s)', 'Agent', 'Guia', 'Versió regles', 'Estat', 'Seqüència'].concat(CAP_MODULS),
+  altres: ['Id', 'Data', 'Id equip', 'Equip', 'Missió', 'Mòduls', 'Temps (s)', 'Peta amb', 'Estat', 'Errors', 'Marge (s)', 'Versió regles', 'Seqüència'].concat(CAP_MODULS),
 };
 
 function doGet() { return surt({ ok: true, servei: 'Boombera' }); }
@@ -40,12 +45,16 @@ function full(nom, capcalera) {
     f = ss.insertSheet(nom);
     f.getRange(1, 1, 1, capcalera.length).setValues([capcalera]);
     f.setFrozenRows(1);
+  } else if (capcalera.length > 1) {
+    // Un full d'una versió anterior: les columnes noves s'afegeixen a la capçalera, i les files velles les deixen buides.
+    var ara = f.getRange(1, 1, 1, capcalera.length).getValues()[0];
+    if (ara.some(function (v, i) { return String(v) !== capcalera[i]; })) f.getRange(1, 1, 1, capcalera.length).setValues([capcalera]);
   }
   return f;
 }
 
 function llegeixDades() {
-  var db = { equips: [], partides: [] };
+  var db = { equips: [], partides: [], altres: [] };
   Object.keys(PESTANYES).forEach(function (t) {
     var f = full(PESTANYES[t], CAPCALERES[t]);
     var n = f.getLastRow() - 1;
@@ -66,6 +75,11 @@ function llegeixDades() {
   db.partides.forEach(function (p) {
     p.id = String(p.id); p.equip = String(p.equip); p.missio = String(p.missio);
     p.guanyada = p.guanyada === true || String(p.guanyada).toUpperCase() === 'TRUE' || p.guanyada === 'Sí';
+    p.errors = Number(p.errors) || 0; p.marge = Number(p.marge) || 0; p.versio = Number(p.versio) || 0;
+    p.estat = String(p.estat || (p.guanyada ? 'guanyada' : 'perduda'));
+  });
+  db.altres.forEach(function (p) {
+    p.id = String(p.id); p.equip = String(p.equip || ''); p.missio = String(p.missio);
     p.errors = Number(p.errors) || 0; p.marge = Number(p.marge) || 0; p.versio = Number(p.versio) || 0;
   });
   return db;

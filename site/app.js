@@ -1,7 +1,7 @@
 // L'app instal·lable: el service worker (funcionar sense connexió), la pantalla encesa durant la missió
 // i demanar que el navegador no esborri la cua de partides. No toca res de la partida.
 const cos = document.body;
-const enJoc = () => cos.dataset.fase === 'joc';
+const enJoc = () => cos.dataset.fase === 'joc' || cos.dataset.fase === 'armant';
 const quiet = () => !enJoc() && ['portada', 'missions', 'lliure'].includes(cos.dataset.panell);
 
 /* ---------- Service worker ---------- */
