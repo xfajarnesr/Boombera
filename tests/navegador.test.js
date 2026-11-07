@@ -486,7 +486,8 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
     return min;
   };
   const calma = await colorsCables();
-  await p.evaluate((d) => { window.__ms = 0; window.__salta((d - 12) * 1000); }, R.NIVELLS[CB].segons);
+  // Es salta des del temps que queda ara (girar i llegir els colors pot haver trigat una estona a la màquina lenta).
+  await p.evaluate(() => { window.__ms = 0; window.__salta((Number(document.querySelector('#temps').dataset.total) - 12) * 1000); });
   await p.waitForFunction(() => Number(document.querySelector('#temps').dataset.total) <= 12, null, { timeout: 15000 })
     .catch(() => assert.fail('el salt de temps'));
   // Amb el rellotge aturat, perquè a una màquina lenta no arribi a 0:00 abans de comprovar l'alarma.
