@@ -56,6 +56,7 @@ export function creaEscena(canvas, senseMoviment) {
   let cares = [];
   const G = { cara: 0, angle: 0, de: 0, a: 0, t0: 0, girant: false, fiMs: -1e9 };
   let avisaCara = () => {};
+  let ombresPetites = [];
   const particules = new THREE.Group(); scene.add(particules);
   const textures = creaTexturesFoc();
 
@@ -130,6 +131,8 @@ export function creaEscena(canvas, senseMoviment) {
     const balises = creaBalises(); balises.forEach((b) => arrel.add(b));
     arrel.traverse((o) => { if (o.isMesh && !o.userData.senseOmbra) { o.castShadow = true; o.receiveShadow = true; } });
     cares[1].visible = false; // la cara amagada no es dibuixa: estalvia feina al PC
+    // Peces petites que fan ombra: mentre la bomba gira no es noten i es deixen de calcular.
+    ombresPetites = []; cares.forEach((c) => c.traverse((o) => { if (o.isMesh && o.castShadow) ombresPetites.push(o); }));
     vista = { moduls, peces, timer, errors, casc, balises };
     entrada = senseMoviment ? 1 : 0;
     temps0 = performance.now();
@@ -222,6 +225,7 @@ export function creaEscena(canvas, senseMoviment) {
     G.girant = true; G.de = G.angle; G.a = G.angle + sentit * Math.PI; G.t0 = performance.now();
     cares.forEach((c) => { c.visible = true; });
     dianes.forEach((d, el) => { el.dataset.amagada = 'true'; });
+    ombresPetites.forEach((o) => { o.castShadow = false; });
     avisaCara(G.cara, true);
     return true;
   }
@@ -238,6 +242,7 @@ export function creaEscena(canvas, senseMoviment) {
         G.girant = false; G.fiMs = ara;
         G.cara = Math.round(G.angle / Math.PI) % 2 === 0 ? 0 : 1;
         cares.forEach((c, i) => { c.visible = i === G.cara || estat === 'petada'; });
+        ombresPetites.forEach((o) => { o.castShadow = true; });
         avisaCara(G.cara, false);
       }
     } else if (!senseMoviment) {
