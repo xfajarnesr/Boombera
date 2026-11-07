@@ -42,7 +42,10 @@ export function creaEscena(canvas, senseMoviment) {
   const camera = new THREE.PerspectiveCamera(24, 1, 0.1, 200);
   const clau = new THREE.SpotLight(0xfff1dd, 400, 60, 0.62, 0.55, 1.6);
   clau.position.set(-4, 8, 19); clau.target.position.set(0, -0.3, 0);
-  clau.castShadow = true; clau.shadow.mapSize.set(1536, 1536); clau.shadow.bias = -0.0006;
+  clau.castShadow = true; clau.shadow.mapSize.set(1536, 1536);
+  // Marge de l'ombra: sense, les superfícies s'ombregen a si mateixes i surten ratlles regulars («acne»).
+  // Es fa més gran com més petit és el mapa d'ombres (vegeu aplicaGrao).
+  clau.shadow.bias = -0.0006; clau.shadow.normalBias = 0.02;
   clau.shadow.camera.near = 8; clau.shadow.camera.far = 40;
   scene.add(clau, clau.target);
   const omplir = new THREE.DirectionalLight(0x9fb4cc, 0.4); omplir.position.set(8, -3, 10); scene.add(omplir);
@@ -206,6 +209,8 @@ export function creaEscena(canvas, senseMoviment) {
     renderer.setPixelRatio(Math.min(dpr, g.pr));
     if (clau.shadow.mapSize.x !== g.ombra) {
       clau.shadow.mapSize.set(g.ombra, g.ombra);
+      const k = 1536 / g.ombra;
+      clau.shadow.bias = -0.0006 * k; clau.shadow.normalBias = 0.02 * k;
       if (clau.shadow.map) { clau.shadow.map.dispose(); clau.shadow.map = null; }
     }
     renderer.shadowMap.type = g.suau ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
@@ -215,7 +220,8 @@ export function creaEscena(canvas, senseMoviment) {
   }
   function mesura(ara, durada) {
     // Tampoc els 3 primers segons: el navegador encara prepara els gràfics i els fotogrames llargs no diuen res del PC.
-    if (window.__ms !== undefined || document.hidden || estat === 'petada' || durada > 1000 || ara < 3000) { mostres = []; tFinestra = ara; return; }
+    // Només es mesura durant la partida: un panell obert al damunt no ha de fer baixar la qualitat de la bomba.
+    if (window.__ms !== undefined || document.hidden || estat !== 'joc' || durada > 1000 || ara < 3000) { mostres = []; tFinestra = ara; return; }
     mostres.push(durada);
     if (ara - tFinestra < 2000) return;
     const o = mostres.slice().sort((x, y) => x - y);
