@@ -18,6 +18,10 @@ El joc desa els equips i les partides en un full de càlcul de Google, a través
    window.BOOMBERA_CONFIG = { servidor: 'https://script.google.com/macros/s/…/exec' };
    ```
 
+## Estat
+
+En marxa des del 7 de novembre de 2026, al full «Boombera: dades» del compte de l'institut. L'adreça és a `site/comu/config.js`. Les proves no la fan servir mai: el servidor de proves serveix un `config.js` sense adreça.
+
 ## Si canvia el codi
 
 Quan canviïn `site/dades/nucli.js` o `apps-script/servidor.gs`, es torna a fer `Codi.gs` amb `npm run apps-script` (una prova comprova que està al dia). Després s'enganxa de nou a l'Apps Script i es fa **Implementa → Gestiona les implementacions → Edita → Versió nova**. Així l'adreça no canvia.

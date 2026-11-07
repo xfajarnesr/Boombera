@@ -31,6 +31,9 @@ const midaPng = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16
   for (const i of Logo.ICONES) assert.deepStrictEqual(midaPng(path.join(SITE, 'icones', i.nom)), [i.mida, i.mida], `${i.nom}: mida`);
   assert.strictEqual(fs.readFileSync(path.join(SITE, 'icones', 'icona.svg'), 'utf8'), Logo.icona() + '\n', 'icona.svg no està al dia: fes npm run icones');
   assert.strictEqual(T.comEsJuga.passos.length, 3);
+  // L'adreça del full és la d'una aplicació web d'Apps Script (o buida, i llavors es desa al navegador).
+  const config = {}; new Function('window', fs.readFileSync(path.join(SITE, 'comu', 'config.js'), 'utf8'))(config);
+  assert(config.BOOMBERA_CONFIG.servidor === '' || /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(config.BOOMBERA_CONFIG.servidor), "config.js: l'adreça ha d'acabar en /exec");
   const html = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
   assert(html.includes('rel="manifest"') && html.includes('apple-touch-icon'));
   console.log("Fitxers de l'app: el service worker està al dia, el manifest i les icones hi són i no es guarda el manual ni el tauler.");

@@ -9,6 +9,9 @@ const TIPUS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const servidor = http.createServer((q, r) => {
   const ruta = decodeURIComponent(q.url.split('?')[0]);
   if (ruta === '/comu/codis.js') { r.writeHead(200, { 'Content-Type': 'text/javascript' }); r.end(codisProva); return; }
+  // Les proves no fan servir mai el full de càlcul de debò: el config.js de les proves no té adreça.
+  // equips.test.js el substitueix pel «full» de mentida quan cal.
+  if (ruta === '/comu/config.js') { r.writeHead(200, { 'Content-Type': 'text/javascript' }); r.end("window.BOOMBERA_CONFIG = { servidor: '' };"); return; }
   let f = path.join(SITE, ruta);
   if (f.endsWith('/')) f += 'index.html';
   fs.readFile(f, (e, d) => {
