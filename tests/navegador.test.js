@@ -62,12 +62,21 @@ async function llegeixCarcassa(p) {
     indicadors: v.filter((x) => x.tipus === 'indicador').map((x) => ({ ences: x.ences === 'true' })),
   };
 }
+// Llegeix la carcassa i cada mòdul. Si un mòdul surt dues vegades, cada instància té les seves dades a «inst».
 const llegeix = async (p, moduls = R.MODULS) => {
   const base = await llegeixCarcassa(p);
   assert.strictEqual(base.indicadors.length, 2);
-  for (const m of moduls) Object.assign(base, await proves[m].llegeix(p));
+  const inst = {};
+  for (const { id, nom } of R.instancies(moduls)) {
+    const d = await proves[nom].llegeix(p, id);
+    if (id === nom) Object.assign(base, d);
+    inst[id] = d;
+  }
+  base.inst = Object.fromEntries(Object.entries(inst).map(([id, d]) => [id, { ...base, ...d }]));
   return base;
 };
+// Les missions es busquen pel codi (per exemple, 3.4).
+const idx = (codi) => { const i = R.NIVELLS.findIndex((n) => n.codi === codi); assert(i >= 0, `no hi ha la missió ${codi}`); return i; };
 const total = (p) => p.evaluate(() => Number(document.querySelector('#temps').dataset.total));
 const fusibles = (p) => p.evaluate(() => Number(document.querySelector('#errors').dataset.n));
 const fet = (p, m) => p.evaluate((x) => document.querySelector('#fets').dataset[x] === 'true', m);
@@ -113,27 +122,112 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await captura(p, 'inici');
   assert.strictEqual(await p.locator('.nivell').count(), R.NIVELLS.length);
 
-  // Cada nivell arrenca amb el seu temps i es pot guanyar sense errors, amb tots els seus mòduls.
-  for (let k = 0; k < 2 * R.NIVELLS.length; k++) {
-    const n = k % R.NIVELLS.length;
-    const { moduls } = R.NIVELLS[n];
+  // Les 24 missions a la pantalla d'inici, agrupades en sis seccions, sense el nom de cap curs.
+  assert.strictEqual(await p.locator('.seccio').count(), R.SECCIONS.length);
+  for (const [i, sec] of R.SECCIONS.entries()) assert.strictEqual(await p.locator('.seccio').nth(i).locator('.nivell').count(), sec.missions.length);
+  assert(R.SECCIONS.every((sec) => sec.nom) && !(await p.textContent('#nota')).match(/\bnivell\b/i));
+
+  // Cada missió porta els mòduls, el temps i els errors que diu. Una segona pestanya amb «moviment reduït»
+  // fa que la càmera no entri volant i que la nota surti de seguida després d'acabar.
+  const ctxR = await nav.newContext({ viewport: { width: 960, height: 540 }, reducedMotion: 'reduce' });
+  // Aquí només es llegeixen dades: es dibuixa molt poc perquè cada missió vagi de pressa a les màquines lentes.
+  await ctxR.addInitScript(() => {
+    window.__ms = 30000; const raf = window.requestAnimationFrame.bind(window); window.__raf = raf;
+    window.requestAnimationFrame = (f) => setTimeout(() => raf(f), window.__ms);
+    const ara = performance.now.bind(performance); let salt = 0; let fix = null;
+    performance.now = () => (fix !== null ? fix + salt : ara() + salt);
+    window.__salta = (ms) => { salt += ms; };
+    window.__atura = () => { fix = ara(); };
+    window.__segueix = () => { salt += fix - ara(); fix = null; };
+  });
+  // En aquesta pestanya els fotogrames són molt espaiats: les esperes comproven l'estat cada 100 ms, no a cada fotograma.
+  const POLL = { polling: 100 };
+  // Els clics de Playwright esperen que l'element estigui quiet durant dos fotogrames: aquí es prem directament.
+  const prem = (sel) => r.evaluate((x) => document.querySelector(x).click(), sel);
+  const r = await ctxR.newPage();
+  r.on('pageerror', (e) => errs.push(e.message));
+  await r.goto(url);
+  await r.waitForFunction(() => document.querySelector('.nivell'), null, { ...POLL, timeout: 60000 });
+  for (const [n, m] of R.NIVELLS.entries()) {
+    await r.waitForFunction(() => !document.querySelector('#nota').hidden, null, POLL);
+    // Mentre es llegeix, el rellotge de la pàgina està aturat: el temps surt exacte encara que la màquina vagi lenta.
+    await r.evaluate(() => window.__atura());
+    await prem(`.nivell[data-nivell="${n}"]`);
+    await r.waitForFunction(() => document.body.dataset.fase === 'joc', null, POLL);
+    const v = await r.evaluate(() => ({
+      missio: { ...document.querySelector('#missio').dataset },
+      espais: [...document.querySelectorAll('#espais li')].map((l) => ({ id: l.dataset.modul, cara: Number(l.dataset.cara) })),
+      instancies: [...document.querySelectorAll('#dianes .instancia')].map((d) => ({ id: d.dataset.instancia, modul: d.dataset.modul, dianes: d.querySelectorAll('.diana').length })),
+      temps: Number(document.querySelector('#temps').dataset.total),
+      errors: document.querySelector('#errors').textContent,
+      max: Number(document.querySelector('#errors').dataset.max),
+    }));
+    const ids = R.instancies(m.moduls);
+    assert.strictEqual(v.missio.codi, m.codi);
+    assert.deepStrictEqual(v.missio.moduls.split(' '), m.moduls, `${m.nom}: mòduls`);
+    assert.deepStrictEqual(v.espais.map((e) => e.id), ids.map((x) => x.id), `${m.nom}: cada mòdul té el seu espai`);
+    assert(v.espais.every((e) => e.cara === 0 || e.cara === 1));
+    assert.deepStrictEqual(v.instancies.map((x) => [x.id, x.modul]), ids.map((x) => [x.id, x.nom]), `${m.nom}: instàncies`);
+    assert(v.instancies.every((x) => x.dianes > 0), `${m.nom}: cada mòdul té alguna cosa per prémer`);
+    assert.strictEqual(v.temps, m.segons, `${m.nom}: temps`);
+    assert.strictEqual(v.errors, `0 de ${m.errors}`, `${m.nom}: errors`);
+    assert.strictEqual(v.max, m.errors);
+    await r.evaluate(() => { window.__segueix(); window.__salta(1200000); });
+    await r.waitForFunction(() => document.body.dataset.fase === 'petada', null, { ...POLL, timeout: 30000 });
+  }
+  await r.waitForFunction(() => !document.querySelector('#nota').hidden, null, POLL);
+
+  // Missió lliure: es trien mòduls, temps i errors, la configuració va a l'enllaç, i obrir l'enllaç la recupera.
+  await prem('#obre-lliure');
+  assert.strictEqual(await r.isVisible('#lliure'), true);
+  assert.strictEqual(await r.isVisible('#nivells'), false);
+  await prem('#comenca-lliure');
+  assert((await r.textContent('#lliure-avis')).includes('mòdul'), 'sense mòduls no es pot començar');
+  for (const mm of ['simbols', 'cables', 'morse']) await prem(`#lliure-moduls input[value="${mm}"]`);
+  await r.selectOption('#lliure-temps', '210');
+  await prem('#lliure-errors input[value="1"]');
+  const enllac = new URL(r.url());
+  assert.deepStrictEqual([enllac.searchParams.get('m'), enllac.searchParams.get('t'), enllac.searchParams.get('e')], ['cables,simbols,morse', '210', '1']);
+  if (CAPTURES) await r.screenshot({ path: path.join(CAPTURES, 'lliure.png') });
+  await prem('#comenca-lliure');
+  await r.waitForFunction(() => document.body.dataset.fase === 'joc', null, POLL);
+  assert.deepStrictEqual(await r.evaluate(() => ({ ...document.querySelector('#missio').dataset })), { codi: 'lliure', moduls: 'cables simbols morse', segons: '210', errors: '1' });
+  await r.evaluate(() => window.__salta(1200000));
+  await r.waitForFunction(() => document.body.dataset.fase === 'petada', null, { ...POLL, timeout: 30000 });
+  await r.goto(`${url}?m=ratlles,boto,boto,xx&t=599&e=2`);
+  await r.waitForFunction(() => document.querySelector('#lliure:not([hidden])'), null, { ...POLL, timeout: 60000 });
+  assert.deepStrictEqual(await r.evaluate(() => [...document.querySelectorAll('#lliure-moduls input:checked')].map((i) => i.value)), ['boto', 'ratlles']);
+  assert.strictEqual(await r.inputValue('#lliure-temps'), '599');
+  assert.strictEqual(await r.evaluate(() => document.querySelector('#lliure-errors input:checked').value), '2');
+  await r.goto(`${url}?m=cables&t=1234&e=2`);
+  await r.waitForFunction(() => document.querySelector('.nivell'), null, { ...POLL, timeout: 60000 });
+  assert.strictEqual(await r.isVisible('#lliure'), false, 'un enllaç dolent no obre la missió lliure');
+  await ctxR.close();
+  console.log(`Les ${R.NIVELLS.length} missions porten els mòduls, el temps i els errors que diuen. La missió lliure es configura i es comparteix per enllaç.`);
+
+  // Es juga sencera una missió de cada secció, sense errors. A la secció 1, amb dos mòduls iguals.
+  const JUGA = ['1.4', '2.4', '3.4', '4.4', '5.4', '6.3'];
+  for (const codi of JUGA) {
+    const n = idx(codi);
+    const ids = R.instancies(R.NIVELLS[n].moduls);
     await nivell(p, n);
-    const inicial = await total(p);
-    assert(inicial <= R.NIVELLS[n].segons && inicial >= R.NIVELLS[n].segons - 15, `temps del nivell: ${inicial}`);
-    assert.strictEqual(await p.locator('#fets').evaluate((f, m) => m.every((x) => f.dataset[x] === 'false'), moduls), true);
-    const b = await llegeix(p, moduls);
-    const cares = new Set(await Promise.all(moduls.map((m) => caraDe(p, m))));
-    assert.strictEqual(cares.size, moduls.length > R.PARTIDA.modulsUnaCara ? 2 : 1, `${R.NIVELLS[n].nom}: cares amb mòduls`);
-    if (n === R.NIVELLS.length - 1 && k < R.NIVELLS.length) await captura(p, 'joc');
+    assert.strictEqual(await p.locator('#fets').evaluate((f, m) => m.every((x) => f.dataset[x] === 'false'), ids.map((x) => x.id)), true);
+    const b = await llegeix(p, R.NIVELLS[n].moduls);
+    if (codi === '1.4') {
+      await captura(p, 'dos-iguals');
+      assert.strictEqual(ids.filter((x) => x.nom === 'cables').length, 2);
+      assert.strictEqual(await p.locator('#boto, #boto-2').count(), 2, 'dos botons, cada un amb el seu identificador');
+    }
+    if (codi === '6.3') await captura(p, 'joc');
     // En ordre aleatori, però acabant una cara abans de girar cap a l'altra.
     const ara = await cara(p);
-    const ordre = await Promise.all([...moduls].sort(() => Math.random() - 0.5).map(async (m) => ({ m, c: (await caraDe(p, m)) === ara ? 0 : 1 })));
-    for (const { m } of ordre.sort((x, y) => x.c - y.c)) {
-      assert.strictEqual(await fet(p, m), false);
-      await veu(p, m);
-      await proves[m].resol(p, R, b);
-      await p.waitForFunction((x) => document.querySelector('#fets').dataset[x] === 'true', m, { timeout: 30000 })
-        .catch(async (e) => { throw new Error(`${m} no queda resolt al nivell ${n + 1} (errors: ${await fusibles(p)}, fase: ${await p.evaluate(() => document.body.dataset.fase)}): ${e.message}`); });
+    const ordre = await Promise.all([...ids].sort(() => Math.random() - 0.5).map(async (x) => ({ ...x, c: (await caraDe(p, x.id)) === ara ? 0 : 1 })));
+    for (const { id, nom } of ordre.sort((x, y) => x.c - y.c)) {
+      assert.strictEqual(await fet(p, id), false);
+      await veu(p, id);
+      await proves[nom].resol(p, R, b.inst[id], id);
+      await p.waitForFunction((x) => document.querySelector('#fets').dataset[x] === 'true', id, { timeout: 30000 })
+        .catch(async (e) => { throw new Error(`${id} no queda resolt a la missió ${codi} (errors: ${await fusibles(p)}, fase: ${await p.evaluate(() => document.body.dataset.fase)}): ${e.message}`); });
     }
     await p.waitForFunction(() => document.body.dataset.fase === 'salvada', null, { timeout: 30000 });
     assert.strictEqual(await fusibles(p), 0);
@@ -141,14 +235,12 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await pausaCaptura(p, 400);
   await captura(p, 'guanya');
   let q;
-  const SIS = R.NIVELLS.findIndex((n) => n.moduls.length === 6 && ['contrasenya', 'simbols'].every((m) => n.moduls.includes(m)));
-  assert(SIS >= 0, "hi ha d'haver un nivell de sis mòduls amb contrasenya i símbols");
-  assert(R.MODULS.every((m) => R.NIVELLS.some((n) => n.moduls.includes(m))), 'tots els mòduls es juguen en algun nivell');
-  console.log(`${2 * R.NIVELLS.length} partides guanyades sense errors, amb els ${R.MODULS.length} mòduls, girant la bomba per llegir la carcassa i resoldre les dues cares.`);
+  const SIS = idx('3.4');
+  assert(R.NIVELLS[SIS].moduls.length === 6 && ['contrasenya', 'simbols'].every((m) => R.NIVELLS[SIS].moduls.includes(m)) && R.NIVELLS[SIS].errors === 2);
+  console.log(`${JUGA.length} missions guanyades sense errors (una de cada secció, amb els ${R.MODULS.length} mòduls i dos mòduls iguals a la secció 1), girant la bomba per llegir la carcassa i resoldre les dues cares.`);
 
   // Girar: les dianes de la cara amagada no es poden prémer, ni cap mentre gira, ni es pot girar amb un botó premut.
-  const TOTS = R.NIVELLS.findIndex((n) => n.moduls.length > R.PARTIDA.espaisCara);
-  assert(TOTS >= 0, 'hi ha un nivell amb més de sis mòduls');
+  const TOTS = idx('6.3');
   await nivell(p, TOTS);
   q = await llegeix(p, R.NIVELLS[TOTS].moduls);
   const cablesAmagats = (await caraDe(p, 'cables')) !== (await cara(p));
@@ -227,7 +319,8 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
 
   // Senyal i laberint: un canal equivocat és error i no toca el visor; topar amb una paret és error i la llum no es mou.
-  const LM = R.NIVELLS.findIndex((n) => ['laberint', 'morse'].every((m) => n.moduls.includes(m)));
+  const LM = idx('4.4');
+  assert(['laberint', 'morse'].every((m) => R.NIVELLS[LM].moduls.includes(m)) && R.NIVELLS[LM].errors === 2);
   const Lab = proves.laberint;
   const juga = async () => {
     await nivell(p, LM);
@@ -282,8 +375,8 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
 
   // Interruptors i cables amb ratlles: errors reals i com es queda cada mòdul després.
-  const NOUS = R.NIVELLS.findIndex((n) => ['interruptors', 'ratlles'].every((m) => n.moduls.includes(m)));
-  assert(NOUS >= 0, 'hi ha un nivell amb interruptors i cables amb ratlles');
+  const NOUS = idx('5.4');
+  assert(['interruptors', 'ratlles'].every((m) => R.NIVELLS[NOUS].moduls.includes(m)) && R.NIVELLS[NOUS].errors === 2);
   const Int = proves.interruptors; const Rat = proves.ratlles;
   const jugaNous = async () => {
     await nivell(p, NOUS);
@@ -336,7 +429,8 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
 
   // Seqüència: una tecla equivocada és error, repeteix la ronda, i els salts pugen també amb errors d'altres mòduls.
-  const QUATRE = R.NIVELLS.findIndex((n) => n.moduls.length === 4);
+  const QUATRE = idx('2.4');
+  assert(['cables', 'boto', 'sequencia', 'memoria'].every((m) => R.NIVELLS[QUATRE].moduls.includes(m)) && R.NIVELLS[QUATRE].errors === 2);
   await nivell(p, QUATRE);
   q = await llegeix(p, R.NIVELLS[QUATRE].moduls);
   await veu(p, 'sequencia');
@@ -392,12 +486,15 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   console.log("Memòria: un error torna a l'etapa 1 amb les mateixes pantalles, i es pot acabar resolent.");
   await p.evaluate(() => { window.__salta(600000); });
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 15000 });
-  await nivell(p, 1);
+  const CB = idx('1.3');
+  assert.deepStrictEqual(R.NIVELLS[CB].moduls, ['cables', 'boto']);
+  assert.strictEqual(R.NIVELLS[CB].errors, 3);
+  await nivell(p, CB);
   const totesSeq = await p.locator('.tecla-mem').count();
-  assert.strictEqual(totesSeq, 0, 'un nivell sense memòria no porta les seves tecles');
+  assert.strictEqual(totesSeq, 0, 'una missió sense memòria no porta les seves tecles');
 
   // Un error resta 30 s i no resol el mòdul.
-  let b = await llegeix(p, R.NIVELLS[1].moduls);
+  let b = await llegeix(p, R.NIVELLS[CB].moduls);
   await veu(p, 'cables');
   const dolent = b.cables.findIndex((_, i) => i !== R.solucioCables(b));
   const t0 = await total(p);
@@ -440,34 +537,39 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   await p.evaluate(() => { window.__ms = 2000; });
 
   // Quan queda poc temps tot es torna vermell, i a 0:00 peta.
-  await nivell(p, 0);
-  await p.evaluate((d) => { window.__ms = 0; window.__salta((d - 12) * 1000); }, R.NIVELLS[0].segons);
+  await nivell(p, CB);
+  await p.evaluate((d) => { window.__ms = 0; window.__salta((d - 12) * 1000); }, R.NIVELLS[CB].segons);
   await p.waitForFunction(() => Number(document.querySelector('#temps').dataset.total) <= 12, null, { timeout: 15000 })
     .catch(() => assert.fail('el salt de temps'));
+  // Amb el rellotge aturat, perquè a una màquina lenta no arribi a 0:00 abans de comprovar l'alarma.
+  await p.evaluate(() => window.__atura());
   await captura(p, 'tensio');
   // Espera el canvi de color, perquè les màquines lentes poden trigar uns quants fotogrames.
   await p.waitForFunction(() => Number(getComputedStyle(document.documentElement).getPropertyValue('--alarma')) > 0, null, { timeout: 15000 })
-    .catch(() => assert.fail('alarma activa'));
-  await p.evaluate(() => { window.__ms = 2000; window.__salta(13000); });
+    .catch(async () => assert.fail(`alarma activa: ${JSON.stringify(await p.evaluate(() => ({ fase: document.body.dataset.fase, alarma: getComputedStyle(document.documentElement).getPropertyValue('--alarma'), temps: document.querySelector('#temps').dataset.total, ms: window.__ms })))}`));
+  await p.evaluate(() => { window.__segueix(); window.__ms = 2000; window.__salta(13000); });
   await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
   assert((await p.textContent('#nota-text')).includes("S'ha acabat el temps"));
   console.log('A 0:00 la bomba peta.');
 
-  // El nivell 3 peta amb menys errors.
-  const lim = R.NIVELLS[2].errors;
-  await nivell(p, 2);
-  b = await llegeix(p, R.NIVELLS[2].moduls);
+  // L'última missió peta al primer error.
+  const ULT = idx('6.4');
+  const lim = R.NIVELLS[ULT].errors;
+  assert.strictEqual(lim, 1);
+  await nivell(p, ULT);
+  b = await llegeix(p, R.NIVELLS[ULT].moduls);
   await veu(p, 'cables');
   const dolents = b.cables.map((_, i) => i).filter((i) => i !== R.solucioCables(b)).slice(0, lim);
   for (const i of dolents) await p.locator(`.cable[data-i="${i}"]`).click();
   await p.waitForFunction(() => document.body.dataset.fase === 'petada', null, { timeout: 20000 });
-  console.log(`El nivell 3 peta amb ${lim} errors.`);
+  assert((await p.textContent('#nota-text')).includes('Heu fet un error'));
+  console.log('La missió 6.4 peta al primer error.');
   await p.waitForFunction(() => !document.querySelector('#nota').hidden, null, { timeout: 30000 });
 
   // Teclat: es pot tallar sense ratolí.
-  await nivell(p, 0);
-  b = await llegeix(p, R.NIVELLS[0].moduls);
+  await nivell(p, CB);
+  b = await llegeix(p, R.NIVELLS[CB].moduls);
   await veu(p, 'cables');
   await p.locator(`.cable[data-i="${R.solucioCables(b)}"]`).focus();
   await p.keyboard.press('Enter');
@@ -494,13 +596,20 @@ const pausaCaptura = (p, ms) => (CAPTURES ? p.waitForTimeout(ms) : null);
   // El manual surt de les dades, no porta la llista de primers i cap en sis pàgines A4.
   await p.setViewportSize({ width: 1000, height: 1200 });
   await p.goto(urlManual);
-  await p.waitForFunction((n) => document.querySelectorAll('#t-nivells tr').length === n && document.fonts.status === 'loaded', R.NIVELLS.length);
+  await p.waitForFunction((n) => document.querySelectorAll('#t-nivells tr').length === n && document.fonts.status === 'loaded', R.SECCIONS.length);
+  // Graella de missions: una fila per secció, una casella per missió, amb el temps i els errors.
+  assert.strictEqual(await p.locator('#t-nivells td[data-codi]').count(), R.NIVELLS.length);
+  for (const n of R.NIVELLS) {
+    const t = await p.textContent(`#t-nivells td[data-codi="${n.codi}"]`);
+    const fmt = `${Math.floor(n.segons / 60)}:${String(n.segons % 60).padStart(2, '0')}`;
+    assert(t.includes(n.codi) && t.includes(fmt) && t.includes(n.errors === 1 ? '1 error' : `${n.errors} errors`), `casella ${n.codi}: ${t}`);
+  }
   const text = await p.textContent('#vista-manual');
   assert(text.includes('Boombera') && text.includes('Parla o peta') && !text.includes('Curtcircuit'), 'nom i lema al manual');
   for (const r of R.REGLES_CABLES) assert(text.includes(r.pregunta), r.pregunta);
   for (const r of R.REGLES_BOTO) assert(text.includes(r.condicio), r.condicio);
   for (const l of Object.values(R.LLUMS)) assert(text.includes(l.text), l.text);
-  for (const n of R.NIVELLS) assert(text.includes(n.nom), n.nom);
+  for (const sec of R.SECCIONS) assert(text.includes(sec.nom), sec.nom);
   for (const c of R.SEQUENCIA.anell) assert(text.includes(c), c);
   for (const c of Object.values(R.CATEGORIES_MEMORIA)) assert(text.includes(c), c);
   for (const f of R.REGLES_MEMORIA) for (const a of Object.values(f)) assert(text.includes(R.textMemoria(a)), R.textMemoria(a));

@@ -8,7 +8,11 @@
 
   function pintaManual() {
     const fmt = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-    $('#t-nivells').innerHTML = R.NIVELLS.map((n) => `<tr><th scope="row">${n.nom}</th><td>${fmt(n.segons)}</td><td>${n.errors} errors</td></tr>`).join('');
+    // Graella de missions: una fila per secció i una casella per missió, amb el temps i els errors.
+    const errs = (n) => (n === 1 ? '1 error' : `${n} errors`);
+    $('#t-nivells').innerHTML = R.SECCIONS.map((s, i) => `<tr><th scope="row"><b>${i + 1}</b> ${esc(s.nom)}</th>${
+      R.NIVELLS.filter((n) => n.seccio === i + 1).map((n) => `<td data-codi="${n.codi}"><span class="codi">${n.codi}</span> ${fmt(n.segons)}, ${errs(n.errors)}</td>`).join('')
+    }</tr>`).join('');
     const primer = $('#vista-manual .full');
     primer.querySelector('[data-full]').textContent = `Full 1 de ${total}`;
     FULLS.forEach((moduls, i) => {

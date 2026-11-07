@@ -8,7 +8,7 @@ const $ = (s) => document.querySelector(s);
 const senseMoviment = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const so = creaSo();
 
-const S = { fase: 'inici', nivell: R.NIVELLS[0], b: null, finalMs: 0, errors: 0, fets: new Set(), controls: [], ultim: null, quiet: 0 };
+const S = { fase: 'inici', nivell: R.NIVELLS[0], b: null, inst: [], ids: [], finalMs: 0, errors: 0, fets: new Set(), controls: [], ultim: null, quiet: 0 };
 const restantMs = () => (S.fase === 'joc' ? S.finalMs - performance.now() : S.quiet);
 const totalSegons = () => Math.max(0, Math.ceil(restantMs() / 1000));
 const format = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -32,13 +32,17 @@ function novaBomba(nivell) {
   aturaModuls();
   S.nivell = nivell;
   S.b = R.generaBomba();
+  // Cada mòdul de la bomba és una instància. Si un mòdul surt dues vegades, la segona porta dades pròpies
+  // (la carcassa és la mateixa), i el mòdul ho rep com si fos l'única bomba.
+  S.inst = R.instancies(nivell.moduls).map(({ id, nom }) => ({ id, nom, b: id === nom ? S.b : { ...S.b, [nom]: R.generaModul(nom, Math.random, S.b) } }));
+  S.ids = S.inst.map((x) => x.id);
   Object.assign(S, { errors: 0, fets: new Set(), controls: [], ultim: null, quiet: nivell.segons * 1000 });
-  esc.construeix(S.b, R.repartimentEspais(nivell.moduls), R.VERSIO);
+  esc.construeix(S.b, R.repartimentEspais(S.ids), R.VERSIO, { instancies: Object.fromEntries(S.inst.map((x) => [x.id, x])), errors: nivell.errors });
   premut = false;
   posaCara(0, false);
   $('#dianes').innerHTML = '';
   $('#dades-moduls').innerHTML = '';
-  S.controls = nivell.moduls.map((nom) => MODULS[nom].creaJoc(contextDe(nom)));
+  S.controls = S.inst.map((x) => MODULS[x.nom].creaJoc(contextDe(x)));
   pintaDades();
   esc.posaTemps(format(totalSegons()), false);
   esc.posaErrors(0);
@@ -47,19 +51,24 @@ function novaBomba(nivell) {
 const aturaModuls = () => S.controls.forEach((c) => c.atura && c.atura());
 
 /* ---------- El que cada mòdul pot demanar a la partida ---------- */
-function contextDe(nom) {
-  const grup = esc.moduls[nom];
+function contextDe({ id: inst, nom, b }) {
+  const grup = esc.moduls[inst];
+  // Les dianes de cada instància van en un grup propi. Els identificadors de la segona porten «-2».
+  const sufix = inst.slice(nom.length);
+  const capsa = document.createElement('div');
+  capsa.className = 'instancia'; capsa.dataset.instancia = inst; capsa.dataset.modul = nom;
+  $('#dianes').appendChild(capsa);
   return {
-    b: S.b, grup, so,
-    actiu: () => S.fase === 'joc' && !S.fets.has(nom),
+    b, grup, so,
+    actiu: () => S.fase === 'joc' && !S.fets.has(inst),
     errors: () => S.errors,
     segons: totalSegons,
     error,
-    resolt: () => modulFet(nom),
-    diana(el, x, y, w, h) { $('#dianes').appendChild(el); esc.diana(el, grup, x, y, w, h); },
+    resolt: () => modulFet(inst),
+    diana(el, x, y, w, h) { if (el.id) el.id += sufix; capsa.appendChild(el); esc.diana(el, grup, x, y, w, h); },
     dada(id, text) {
       const p = document.createElement('p');
-      p.id = id; p.textContent = text; p.setAttribute('aria-live', 'polite');
+      p.id = id + sufix; p.textContent = text; p.setAttribute('aria-live', 'polite');
       $('#dades-moduls').appendChild(p);
       return p;
     },
@@ -88,13 +97,15 @@ function posaCara(cara, girant) {
 }
 function pintaDades() {
   pintaCarcassa();
-  $('#espais').innerHTML = S.nivell.moduls.map((m) => { const c = esc.caraDeModul(m); return `<li data-modul="${m}" data-cara="${c}">${m}: cara ${c === 0 ? 'del davant' : 'de darrere'}</li>`; }).join('');
+  $('#espais').innerHTML = S.ids.map((m) => { const c = esc.caraDeModul(m); return `<li data-modul="${m}" data-cara="${c}">${m}: cara ${c === 0 ? 'del davant' : 'de darrere'}</li>`; }).join('');
+  $('#missio').textContent = `${S.nivell.nom}: ${S.ids.length} mòduls, ${format(S.nivell.segons)}, ${S.nivell.errors} errors`;
+  Object.assign($('#missio').dataset, { codi: S.nivell.codi, moduls: S.nivell.moduls.join(' '), segons: S.nivell.segons, errors: S.nivell.errors });
   pintaErrors(); pintaTemps(); pintaFets();
   $('#estat').textContent = 'Partida a punt';
 }
 function pintaErrors() {
   $('#errors').textContent = `${S.errors} de ${S.nivell.errors}`;
-  $('#errors').dataset.n = S.errors;
+  $('#errors').dataset.n = S.errors; $('#errors').dataset.max = S.nivell.errors;
 }
 function pintaTemps() {
   const t = totalSegons();
@@ -103,7 +114,7 @@ function pintaTemps() {
 }
 function pintaFets() {
   const f = $('#fets');
-  S.nivell.moduls.forEach((nom) => { f.dataset[nom] = S.fets.has(nom); });
+  S.ids.forEach((id) => { f.dataset[id] = S.fets.has(id); });
 }
 
 /* ---------- Partida ---------- */
@@ -124,7 +135,7 @@ function error() {
   esc.posaErrors(S.errors); pintaErrors();
   so.error();
   document.body.classList.remove('copet'); void document.body.offsetWidth; document.body.classList.add('copet');
-  if (S.errors >= S.nivell.errors) acaba(false, `Heu fet ${S.nivell.errors} errors.`);
+  if (S.errors >= S.nivell.errors) acaba(false, S.nivell.errors === 1 ? 'Heu fet un error.' : `Heu fet ${S.nivell.errors} errors.`);
   else if (restantMs() <= 0) acaba(false, 'Els errors us han deixat sense temps.');
 }
 function modulFet(nom) {
@@ -132,7 +143,7 @@ function modulFet(nom) {
   so.modul();
   esc.moduls[nom].userData.marcaFet();
   pintaFets();
-  if (S.nivell.moduls.every((m) => S.fets.has(m))) acaba(true);
+  if (S.ids.every((m) => S.fets.has(m))) acaba(true);
 }
 
 function esquerdes() {
@@ -174,13 +185,13 @@ function acaba(guanya, motiu = '') {
   const errs = S.errors === 1 ? '1 error' : `${S.errors} errors`;
   $('#nota-titol').textContent = guanya ? 'Bomba desactivada' : 'Ha petat';
   $('#nota-text').innerHTML = guanya
-    ? `<p>Marge de ${format(t)} i ${errs}. Canvieu els papers i trieu nivell.</p>`
-    : `<p>${motiu} Canvieu els papers i trieu nivell.</p>`;
+    ? `<p>Marge de ${format(t)} i ${errs}. Canvieu els papers i trieu missió.</p>`
+    : `<p>${motiu} Canvieu els papers i trieu missió.</p>`;
   if (guanya) {
     esc.salvada(); so.guanya();
     $('#nota').hidden = false;
   } else {
-    const o = esc.origenDe(S.nivell.moduls.find((m) => !S.fets.has(m)) || S.nivell.moduls[0]).clone(); o.z = 1;
+    const o = esc.origenDe(S.ids.find((m) => !S.fets.has(m)) || S.ids[0]).clone(); o.z = 1;
     esc.explota(o); so.explosio();
     esquerdes();
     setTimeout(() => { $('#nota').hidden = false; const b = document.querySelector('.nivell'); if (b) b.focus(); }, senseMoviment ? 300 : 3200);
@@ -188,13 +199,56 @@ function acaba(guanya, motiu = '') {
   document.querySelectorAll('.diana').forEach((d) => { d.disabled = true; });
 }
 
-/* ---------- Nivells ---------- */
+/* ---------- Missions ---------- */
+const errorsText = (n) => (n === 1 ? '1 error' : `${n} errors`);
 function pintaNivells() {
-  $('#nivells').innerHTML = R.NIVELLS.map((n, i) => `<button type="button" class="nivell" data-nivell="${i}"><strong>${n.nom}</strong><span>${format(n.segons)} i ${n.errors} errors</span></button>`).join('');
+  $('#nivells').innerHTML = R.SECCIONS.map((sec, i) => `<div class="seccio"><h3><b>${i + 1}</b>${sec.nom}</h3>${
+    R.NIVELLS.map((n, k) => [n, k]).filter(([n]) => n.seccio === i + 1).map(([n, k]) => `<button type="button" class="nivell" data-nivell="${k}" data-codi="${n.codi}" aria-label="${n.nom}: ${n.moduls.length} mòduls, ${format(n.segons)}, peta amb ${errorsText(n.errors)}"><strong>${n.codi}</strong><span>${n.moduls.length} mòduls</span><span>${format(n.segons)} · ${errorsText(n.errors)}</span></button>`).join('')
+  }</div>`).join('');
   $('#nivells').addEventListener('click', (e) => {
     const b = e.target.closest('.nivell');
     if (b) comenca(R.NIVELLS[Number(b.dataset.nivell)]);
   });
+  pintaLliure();
+}
+
+/* ---------- Missió lliure ---------- */
+// La configuració va a l'enllaç (?m=cables,boto&t=300&e=3): es pot compartir sense desar res.
+function pintaLliure() {
+  const q = new URLSearchParams(location.search);
+  const deUrl = q.has('m') ? R.missioLliure(q.get('m').split(','), Number(q.get('t')), Number(q.get('e'))) : null;
+  const ini = deUrl || { moduls: [], ...R.LLIURE.perDefecte };
+  $('#lliure-moduls').innerHTML = R.MODULS.map((m) => `<label class="xip"><input type="checkbox" name="modul" value="${m}"${ini.moduls.includes(m) ? ' checked' : ''}> ${R.NOMS_MODULS[m]}</label>`).join('');
+  $('#lliure-temps').innerHTML = R.LLIURE.segons.map((t) => `<option value="${t}"${t === ini.segons ? ' selected' : ''}>${format(t)}</option>`).join('');
+  $('#lliure-errors').innerHTML = R.LLIURE.errors.map((n) => `<label class="xip"><input type="radio" name="errors" value="${n}"${n === ini.errors ? ' checked' : ''}> ${n}</label>`).join('');
+  const f = $('#lliure');
+  f.addEventListener('change', () => { const m = llegeixLliure(); if (m) desaUrl(m); avisLliure(m); });
+  $('#obre-lliure').addEventListener('click', () => obreLliure(true));
+  $('#torna-missions').addEventListener('click', () => obreLliure(false));
+  $('#copia-lliure').addEventListener('click', async () => {
+    const m = llegeixLliure(); if (!m) return avisLliure(m);
+    desaUrl(m);
+    try { await navigator.clipboard.writeText(location.href); $('#lliure-avis').textContent = 'Enllaç copiat.'; } catch { $('#lliure-avis').textContent = `Copieu l'enllaç de la barra d'adreces.`; }
+  });
+  f.addEventListener('submit', (e) => { e.preventDefault(); const m = llegeixLliure(); if (m) comenca(m); else avisLliure(m); });
+  if (deUrl) obreLliure(true);
+}
+function llegeixLliure() {
+  const f = $('#lliure');
+  const moduls = [...f.querySelectorAll('input[name="modul"]:checked')].map((i) => i.value);
+  const e = f.querySelector('input[name="errors"]:checked');
+  return R.missioLliure(moduls, Number($('#lliure-temps').value), e ? Number(e.value) : 0);
+}
+const avisLliure = (m) => { $('#lliure-avis').textContent = m ? '' : 'Trieu com a mínim un mòdul.'; };
+function desaUrl(m) {
+  const u = new URL(location.href);
+  u.search = new URLSearchParams({ m: m.moduls.join(','), t: m.segons, e: m.errors }).toString();
+  try { history.replaceState(null, '', u); } catch { /* en una pàgina incrustada pot no deixar-ho */ }
+}
+function obreLliure(obre) {
+  $('#lliure').hidden = !obre; $('#tria').hidden = obre;
+  document.body.dataset.panell = obre ? 'lliure' : 'missions';
+  (obre ? $('#lliure input') : $('#obre-lliure')).focus();
 }
 
 /* ---------- So ---------- */

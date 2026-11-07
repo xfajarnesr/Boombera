@@ -39,8 +39,9 @@ module.exports = {
     assert(b.cables.length >= 3 && b.cables.length <= 5 && R.senseMesDeDos(b.cables));
     assert.strictEqual(R.solucioCables(b), oracle(b));
   },
-  llegeix: (p) => p.evaluate(() => ({ cables: [...document.querySelectorAll('.cable')].map((c) => c.dataset.color) })),
-  async resol(p, R, b) {
-    await p.locator(`.cable[data-i="${R.solucioCables(b)}"]`).click();
+  // id: quina instància del mòdul, si a la bomba n'hi ha dues («cables» o «cables-2»).
+  llegeix: (p, id = 'cables') => p.evaluate((x) => ({ cables: [...document.querySelectorAll(`[data-instancia="${x}"] .cable`)].map((c) => c.dataset.color) }), id),
+  async resol(p, R, b, id = 'cables') {
+    await p.locator(`[data-instancia="${id}"] .cable[data-i="${R.solucioCables(b)}"]`).click();
   },
 };

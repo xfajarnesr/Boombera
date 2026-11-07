@@ -27,6 +27,7 @@
     <div id="dades-moduls"></div>
     <p id="fets"></p>
     <p id="estat" aria-live="assertive"></p>
+    <p id="missio"></p>
   </div>
 
   <button id="gira" type="button" aria-label="Gira la bomba" title="Gira la bomba"></button>
@@ -42,7 +43,24 @@
       <p class="lema">Parla o peta</p>
       <p>Seieu d'esquena. Qui desactiva veu aquesta pantalla, qui fa d'expert té el manual, i només podeu parlar.</p>
     </div>
-    <div id="nivells"></div>
+    <div id="tria">
+      <div id="nivells"></div>
+      <button type="button" id="obre-lliure" class="lliure-boto">Missió lliure<span>Tria els mòduls, el temps i els errors</span></button>
+    </div>
+    <form id="lliure" hidden>
+      <h3>Missió lliure</h3>
+      <fieldset><legend>Mòduls</legend><div id="lliure-moduls"></div></fieldset>
+      <div class="lliure-fila">
+        <label>Temps <select id="lliure-temps"></select></label>
+        <fieldset class="lliure-errors"><legend>Peta amb</legend><div id="lliure-errors"></div></fieldset>
+      </div>
+      <p class="lliure-avis" id="lliure-avis" aria-live="polite"></p>
+      <div class="lliure-accions">
+        <button type="button" id="torna-missions">Torna</button>
+        <button type="button" id="copia-lliure">Copia l'enllaç</button>
+        <button type="submit" id="comenca-lliure">Comença</button>
+      </div>
+    </form>
   </section>
   <p id="sense3d" hidden>Aquest ordinador no pot mostrar gràfics 3D. Prova-ho amb un altre navegador o activa l'acceleració gràfica.</p>
 </main>

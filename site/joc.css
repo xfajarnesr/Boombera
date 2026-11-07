@@ -79,16 +79,40 @@ body.fos #escena { animation: fos .3s; }
 #nota h2 { font-family: var(--estargit); font-weight: 400; font-size: clamp(40px, 7vw, 62px); line-height: 1; margin: 0 0 12px; color: #fff; }
 #nota p { margin: 0 0 18px; font-size: 18px; line-height: 1.4; max-width: 56ch; }
 body[data-fase="salvada"] #nota { border-top-color: #35ff77; }
-#nivells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.nivell {
-  background: #1b1d1f; border: 1px solid #5c5f5f; color: #fff; padding: 12px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left;
-  font: 14px var(--text);
+#nota { max-height: calc(100% - 24px); overflow-y: auto; }
+body[data-fase="inici"] #nota, body[data-fase="salvada"] #nota, body[data-fase="petada"] #nota { width: min(760px, calc(100% - 32px)); }
+#nivells { display: grid; gap: 6px; margin-bottom: 10px; }
+.seccio { display: grid; grid-template-columns: 150px repeat(4, 1fr); gap: 6px; align-items: stretch; }
+.seccio h3 { margin: 0; display: flex; flex-direction: column; justify-content: center; font: 700 15px/1.1 var(--titols); text-transform: uppercase; letter-spacing: .04em; color: #cfd2cc; }
+.seccio h3 b { font-size: 26px; color: #ff3b2a; }
+.nivell, .lliure-boto, #lliure button {
+  background: #1b1d1f; border: 1px solid #5c5f5f; color: #fff; padding: 7px 9px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left;
+  font: 13px/1.25 var(--text);
 }
-.nivell strong { font: 700 24px var(--titols); }
-.nivell:hover { background: #ff2a14; border-color: #ff2a14; }
+.nivell strong { font: 700 22px/1 var(--titols); }
+.nivell:hover, .nivell:focus-visible, .lliure-boto:hover, .lliure-boto:focus-visible, #lliure button:hover, #lliure button:focus-visible { background: #ff2a14; border-color: #ff2a14; }
+.lliure-boto { width: 100%; flex-direction: row; align-items: baseline; gap: 12px; font: 700 20px var(--titols); text-transform: uppercase; letter-spacing: .03em; }
+.lliure-boto span { font: 14px var(--text); text-transform: none; letter-spacing: 0; color: #cfd2cc; }
+#lliure h3 { margin: 0 0 10px; font: 700 26px var(--titols); text-transform: uppercase; }
+#lliure fieldset { border: 0; padding: 0; margin: 0 0 12px; }
+#lliure legend { font: 700 15px var(--titols); text-transform: uppercase; letter-spacing: .04em; color: #cfd2cc; margin-bottom: 6px; }
+#lliure-moduls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.xip { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid #5c5f5f; background: #1b1d1f; cursor: pointer; font-size: 15px; }
+.xip:has(input:checked) { border-color: #ff2a14; background: #3a110c; }
+.xip input { accent-color: #ff2a14; width: 18px; height: 18px; margin: 0; }
+.lliure-fila { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
+.lliure-fila > label { display: flex; flex-direction: column; gap: 6px; font: 700 15px var(--titols); text-transform: uppercase; letter-spacing: .04em; color: #cfd2cc; }
+#lliure select { font: 18px var(--text); background: #1b1d1f; color: #fff; border: 1px solid #5c5f5f; padding: 6px 8px; }
+.lliure-errors { margin: 0 !important; }
+#lliure-errors { display: flex; gap: 6px; }
+#lliure-errors .xip { padding: 6px 12px; }
+#nota .lliure-avis { min-height: 1.4em; margin: 0 0 8px; font-size: 15px; color: #ffb3a8; }
+.lliure-accions { display: flex; gap: 8px; justify-content: flex-end; }
+#lliure .lliure-accions button { font: 700 18px var(--titols); text-transform: uppercase; padding: 9px 16px; }
+#lliure #comenca-lliure { background: #ff2a14; border-color: #ff2a14; }
 #sense3d { position: absolute; left: 24px; top: 24px; max-width: 520px; font-size: 20px; }
 
-@media (max-width: 560px) { #nivells { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .seccio { grid-template-columns: repeat(4, 1fr); } .seccio h3 { grid-column: 1 / -1; flex-direction: row; gap: 8px; align-items: baseline; } .nivell span { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   body[data-fase="petada"] #flaix, body.copet #escena, body[data-fase="petada"] #esquerdes { animation: none; }
 }

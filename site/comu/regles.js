@@ -1,22 +1,74 @@
 // Font única de les regles. El joc, el manual i les proves llegeixen d'aquí.
 (function (arrel) {
-  const VERSIO = 8;
+  const VERSIO = 9;
 
-  // La bomba té dues cares de sis espais. Amb pocs mòduls només es fa servir la del davant.
-  const PARTIDA = { penalitzacio: 30, mantenirMs: 500, espaisCara: 6, cares: 2, modulsUnaCara: 4, ranuresCara: 4 };
+  // La bomba té dues cares de sis espais. Cada mòdul va a qualsevol dels dotze, a l'atzar.
+  const PARTIDA = { penalitzacio: 30, mantenirMs: 500, espaisCara: 6, cares: 2, ranuresCara: 4, maxErrors: 3, maxSegons: 599 };
 
-  // Cada nivell diu quins mòduls porta la bomba, de quant temps disposa i quants errors la fan petar.
-  const NIVELLS = [
-    // Provisionals: més mòduls i més temps. La llista definitiva es decidirà més endavant.
-    { nom: 'Nivell 1', segons: 180, errors: 3, moduls: ['cables', 'boto'] },
-    { nom: 'Nivell 2', segons: 240, errors: 3, moduls: ['cables', 'boto', 'sequencia'] },
-    { nom: 'Nivell 3', segons: 300, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria'] },
-    { nom: 'Nivell 4', segons: 420, errors: 2, moduls: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'] },
-    { nom: 'Nivell 5', segons: 480, errors: 2, moduls: ['cables', 'boto', 'memoria', 'simbols', 'laberint', 'morse'] },
-    { nom: 'Nivell 6', segons: 480, errors: 2, moduls: ['cables', 'boto', 'memoria', 'simbols', 'interruptors', 'ratlles'] },
-    // Provisional: tots els mòduls, repartits entre les dues cares.
-    { nom: 'Nivell 7', segons: 570, errors: 3, moduls: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'] },
+  // Missions: sis seccions de quatre. A cada secció entren dos mòduls nous: primer cada un amb mòduls ja coneguts,
+  // després tots dos junts i, al final, una barreja més llarga. Un mòdul pot sortir dues vegades (cada una diferent).
+  const m = (segons, errors, ...moduls) => ({ segons, errors, moduls });
+  const SECCIONS = [
+    { nom: 'Primer contacte', missions: [
+      m(150, 3, 'cables', 'cables'),
+      m(150, 3, 'boto', 'boto'),
+      m(180, 3, 'cables', 'boto'),
+      m(210, 2, 'cables', 'cables', 'boto', 'boto'),
+    ] },
+    { nom: 'Llums i números', missions: [
+      m(180, 3, 'sequencia', 'cables'),
+      m(180, 3, 'memoria', 'boto'),
+      m(270, 3, 'sequencia', 'memoria', 'cables'),
+      m(300, 2, 'cables', 'boto', 'sequencia', 'memoria'),
+    ] },
+    { nom: 'Lletres i signes', missions: [
+      m(240, 3, 'contrasenya', 'sequencia', 'cables'),
+      m(240, 3, 'simbols', 'memoria', 'boto'),
+      m(300, 3, 'contrasenya', 'simbols', 'boto', 'memoria'),
+      m(390, 2, 'cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols'),
+    ] },
+    { nom: 'A cegues', missions: [
+      m(270, 3, 'laberint', 'boto', 'contrasenya'),
+      m(270, 3, 'morse', 'cables', 'simbols'),
+      m(330, 3, 'laberint', 'morse', 'simbols', 'cables'),
+      m(480, 2, 'laberint', 'morse', 'cables', 'boto', 'memoria', 'contrasenya', 'simbols'),
+    ] },
+    { nom: 'Zeros i uns', missions: [
+      m(300, 3, 'interruptors', 'memoria', 'laberint'),
+      m(330, 3, 'ratlles', 'sequencia', 'morse'),
+      m(360, 3, 'interruptors', 'ratlles', 'contrasenya', 'sequencia'),
+      m(540, 2, 'interruptors', 'ratlles', 'laberint', 'morse', 'cables', 'boto', 'memoria', 'simbols'),
+    ] },
+    { nom: 'Prova final', missions: [
+      m(360, 2, 'cables', 'sequencia', 'simbols', 'laberint', 'interruptors', 'ratlles'),
+      m(480, 2, 'boto', 'memoria', 'contrasenya', 'morse', 'laberint', 'interruptors', 'ratlles', 'simbols'),
+      m(599, 3, 'cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'),
+      m(570, 1, 'cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'),
+    ] },
   ];
+  // Totes les missions en una llista: el codi és secció.missió (per exemple, 3.4).
+  const NIVELLS = SECCIONS.flatMap((s, i) => s.missions.map((x, j) => ({ ...x, seccio: i + 1, codi: `${i + 1}.${j + 1}`, nom: `Missió ${i + 1}.${j + 1}` })));
+
+  // Missió lliure: es trien els mòduls (cada un com a molt una vegada), el temps i els errors.
+  const LLIURE = { segons: [...Array.from({ length: 18 }, (_, k) => 60 + 30 * k), 599], errors: [1, 2, 3], perDefecte: { segons: 300, errors: 3 } };
+  function missioLliure(moduls, segons, errors) {
+    const ms = [...new Set(moduls)].filter((x) => MODULS_TOTS.includes(x));
+    if (!ms.length || !LLIURE.segons.includes(segons) || !LLIURE.errors.includes(errors)) return null;
+    return { nom: 'Missió lliure', codi: 'lliure', lliure: true, segons, errors, moduls: MODULS_TOTS.filter((x) => ms.includes(x)) };
+  }
+
+  // Cada mòdul de la bomba té un identificador: el nom, i si surt dues vegades, la segona és «nom-2».
+  const instancies = (moduls) => {
+    const vistos = {};
+    return moduls.map((nom) => { vistos[nom] = (vistos[nom] || 0) + 1; return { id: vistos[nom] === 1 ? nom : `${nom}-${vistos[nom]}`, nom }; });
+  };
+
+  // Com es diu cada mòdul a la pantalla i al manual.
+  const NOMS_MODULS = {
+    cables: 'Cables', boto: 'Botó', sequencia: 'Seqüència', memoria: 'Memòria', contrasenya: 'Contrasenya',
+    simbols: 'Símbols', laberint: 'Laberint', morse: 'Senyal', interruptors: 'Interruptors', ratlles: 'Cables amb ratlles',
+  };
+  const MODULS_TOTS = ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'];
 
   const COLORS_CABLE = {
     vermell: '#d3261e', blau: '#1f5fd6', groc: '#f0bb12', verd: '#1c9a45', negre: '#17181a',
@@ -322,14 +374,9 @@
     while (new Set(llocs.map((l) => Math.floor(l / PARTIDA.ranuresCara))).size < PARTIDA.cares);
     return peces.map((p, k) => ({ ...p, cara: Math.floor(llocs[k] / PARTIDA.ranuresCara), ranura: llocs[k] % PARTIDA.ranuresCara }));
   }
-  // On va cada mòdul: amb pocs mòduls, tots davant; si no, a qualsevol de les dues cares, amb algun a cada cara.
+  // On va cada mòdul: a qualsevol dels dotze espais, a l'atzar. Rep els identificadors dels mòduls.
   function repartimentEspais(moduls, rng = Math.random) {
-    const per = PARTIDA.espaisCara;
-    const cares = moduls.length > PARTIDA.modulsUnaCara ? PARTIDA.cares : 1;
-    let espais;
-    do { espais = barreja([...moduls, ...Array(per * cares - moduls.length).fill(null)], rng); }
-    while (cares > 1 && [0, 1].some((c) => espais.slice(c * per, (c + 1) * per).every((x) => x === null)));
-    return [...espais, ...Array(per * (PARTIDA.cares - cares)).fill(null)];
+    return barreja([...moduls, ...Array(PARTIDA.espaisCara * PARTIDA.cares - moduls.length).fill(null)], rng);
   }
   const senseMesDeDos = (c) => c.every((x) => c.filter((y) => y === x).length <= 2);
 
@@ -415,39 +462,47 @@
     }
   }
 
+  // Les dades d'un mòdul concret. La carcassa (número, piles, indicadors) és la mateixa per a tota la bomba.
+  function generaModul(nom, rng, b) {
+    const carcassa = { numero: b.numero, piles: b.piles, indicadors: b.indicadors };
+    switch (nom) {
+      case 'cables': {
+        const noms = Object.keys(COLORS_CABLE);
+        const n = 3 + Math.floor(rng() * 3);
+        let cables;
+        do { cables = Array.from({ length: n }, () => tria(noms, rng)); } while (!senseMesDeDos(cables));
+        return cables;
+      }
+      case 'boto': return { color: tria(Object.keys(COLORS_BOTO), rng), paraula: tria(PARAULES, rng) };
+      case 'sequencia': return generaSequencia(rng);
+      case 'memoria': return generaMemoria(rng);
+      case 'contrasenya': return generaContrasenya(rng);
+      case 'simbols': return generaSimbols(rng);
+      case 'laberint': return generaLaberint(rng, b.piles);
+      case 'morse': return generaMorse(rng);
+      case 'interruptors': return generaInterruptors(rng, carcassa);
+      case 'ratlles': return generaRatlles(rng, carcassa);
+      default: throw new Error(`mòdul desconegut: ${nom}`);
+    }
+  }
+
   function generaBomba(rng = Math.random) {
-    const noms = Object.keys(COLORS_CABLE);
-    const n = 3 + Math.floor(rng() * 3);
-    let cables;
-    do { cables = Array.from({ length: n }, () => tria(noms, rng)); } while (!senseMesDeDos(cables));
     const lletres = Array.from({ length: 3 }, () => tria(LLETRES.split(''), rng)).join('');
     const numero = 10 + Math.floor(rng() * 90);
     const etiquetes = [...ETIQUETES].sort(() => rng() - 0.5).slice(0, 2);
     const piles = 1 + Math.floor(rng() * 4);
     const indicadors = etiquetes.map((etiqueta) => ({ etiqueta, ences: rng() < 0.5 }));
-    const carcassa = { numero, piles, indicadors };
-    return {
-      lletres, numero, cables,
-      piles,
-      indicadors,
-      boto: { color: tria(Object.keys(COLORS_BOTO), rng), paraula: tria(PARAULES, rng) },
-      sequencia: generaSequencia(rng),
-      memoria: generaMemoria(rng),
-      contrasenya: generaContrasenya(rng),
-      simbols: generaSimbols(rng),
-      laberint: generaLaberint(rng, piles),
-      morse: generaMorse(rng),
-      interruptors: generaInterruptors(rng, carcassa),
-      ratlles: generaRatlles(rng, carcassa),
-      ranures: generaRanures(rng, piles, indicadors),
-    };
+    const b = { lletres, numero, piles, indicadors };
+    for (const nom of MODULS_TOTS) b[nom] = generaModul(nom, rng, b);
+    b.ranures = generaRanures(rng, piles, indicadors);
+    return b;
   }
 
   const api = {
     VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
     reglaCables, solucioCables, solucioBoto, generaBomba, generaRanures, repartimentEspais,
-    MODULS: ['cables', 'boto', 'sequencia', 'memoria', 'contrasenya', 'simbols', 'laberint', 'morse', 'interruptors', 'ratlles'],
+    MODULS: MODULS_TOTS, NOMS_MODULS, SECCIONS, LLIURE, missioLliure, instancies, generaModul,
     SEQUENCIA, saltsSequencia, sentitSequencia, respostaSequencia,
     MEMORIA, CATEGORIES_MEMORIA, REGLES_MEMORIA, categoriaMemoria, textMemoria, solucioMemoria,
     CONTRASENYA, paraulesDeRodets, triaContrasenya, solucioContrasenya,

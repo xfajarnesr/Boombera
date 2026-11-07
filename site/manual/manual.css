@@ -25,7 +25,10 @@ body { background: #3b3d3f; color-scheme: light; color: #000; font-family: var(-
 .full tbody th { font-weight: 700; white-space: nowrap; }
 .full .paraula { font-family: var(--titols); font-size: 15pt; }
 .llums th { width: 32mm; }
-.nivells { width: 70%; }
+.nivells { width: 100%; }
+.nivells td { white-space: nowrap; }
+.nivells th[scope="row"] { white-space: nowrap; }
+.nivells .codi { font-weight: 700; margin-right: .6mm; }
 .amb-anell { display: grid; grid-template-columns: 1fr 50mm; gap: 5mm; align-items: center; }
 .anell { width: 100%; font-family: var(--titols); font-weight: 700; font-size: 15px; }
 .anell .centre { font-size: 10px; font-weight: 400; font-family: var(--text); }
@@ -71,7 +74,7 @@ body { background: #3b3d3f; color-scheme: light; color: #000; font-family: var(-
   .full { width: 210mm; max-width: none; height: 297mm; min-height: 0; box-shadow: none; break-after: page; overflow: hidden; }
   .full:last-child { break-after: auto; }
 }
-.full .nivells th, .full .nivells td { padding: 1.3mm 2.4mm; }
+.full .nivells th, .full .nivells td { padding: .8mm 1.8mm; }
 .interruptors { width: 78%; }
 .interruptors td { padding: 1.3mm 2.4mm; }
 .pesos { display: flex; gap: 8mm; margin: 1mm 0 2mm; }

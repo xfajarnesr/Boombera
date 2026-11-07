@@ -92,7 +92,8 @@ export function creaEscena(canvas, senseMoviment) {
     });
   }
 
-  function construeix(bomba, espais, versio) {
+  // espais: identificador del mòdul de cada espai (o null). instancies: per a cada identificador, el nom del mòdul i les seves dades.
+  function construeix(bomba, espais, versio, { instancies = {}, errors: maxErrors = 3 } = {}) {
     [...arrel.children].forEach((c) => { neteja(c); arrel.remove(c); });
     [...particules.children].forEach((c) => { particules.remove(c); if (c.material) c.material.dispose(); });
     parts.length = 0; volen.length = 0;
@@ -116,15 +117,16 @@ export function creaEscena(canvas, senseMoviment) {
     const moduls = {};
     const timer = creaTimer();
     const timers = []; const errors = [];
-    espais.forEach((nom, n) => {
+    espais.forEach((id, n) => {
       const [x, y] = ESPAIS[n % ESPAIS.length];
-      const g = nom ? MODULS[nom].crea3D(bomba) : espaiBuit();
+      const inst = id && (instancies[id] || { nom: id, b: bomba });
+      const g = id ? MODULS[inst.nom].crea3D(inst.b) : espaiBuit();
       g.position.set(x, y, 0.03);
       cares[Math.floor(n / ESPAIS.length)].add(g); peces.push(g);
-      if (nom) moduls[nom] = g;
+      if (id) moduls[id] = g;
     });
     cares.forEach((grup, c) => {
-      const cap = creaCapcalera(bomba, versio, M, c, timer);
+      const cap = creaCapcalera(bomba, versio, M, c, timer, maxErrors);
       grup.add(cap.grup); peces.push(cap.grup);
       timers.push(cap.timer); errors.push(cap.errors);
     });
@@ -393,7 +395,7 @@ export function creaEscena(canvas, senseMoviment) {
 
   // Capçalera d'una cara: temporitzador i errors al mig (iguals a totes dues cares) i les peces de la carcassa
   // que hagin tocat a aquesta cara, cada una a la seva ranura.
-  function creaCapcalera(bomba, versio, M, cara, timerBase) {
+  function creaCapcalera(bomba, versio, M, cara, timerBase, maxErrors) {
     const g = new THREE.Group();
     const Y = 3.12;
     const banda = new THREE.Mesh(new THREE.BoxGeometry(AMPLE - 0.55, 1.72, 0.03), M.banda); banda.position.set(0, Y + 0.09, 0.015); g.add(banda);
@@ -440,10 +442,11 @@ export function creaEscena(canvas, senseMoviment) {
     vidre.material.userData.propi = true;
     vidre.position.set(-0.5, Y - 0.02, 0.2); vidre.userData.senseOmbra = true; g.add(vidre);
     const re = etiqueta('Errors', { alt: 0.18, color: '#cfd2cc' }); re.position.set(1.5, Y + 0.36, 0.19); g.add(re);
-    const errors = [0, 1, 2].map((i) => {
+    // Tants llums com errors aguanta la bomba: quan s'encenen tots, peta.
+    const errors = Array.from({ length: maxErrors }, (_, i) => i).map((i) => {
       const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), new THREE.MeshStandardMaterial({ color: 0x3a2320, emissive: 0xff2010, emissiveIntensity: 0, roughness: 0.25 }));
       m.material.userData.propi = true; m.scale.z = 0.6; m.userData.i = i;
-      m.position.set(1.16 + i * 0.34, Y + 0.02, 0.2); g.add(m);
+      m.position.set(1.5 + (i - (maxErrors - 1) / 2) * 0.34, Y + 0.02, 0.2); g.add(m);
       return m;
     });
     const rv = etiqueta(`Regles v${versio}`, { alt: 0.15, color: '#8e918b' }); rv.position.set(1.5, Y - 0.38, 0.19); g.add(rv);
