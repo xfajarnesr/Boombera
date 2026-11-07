@@ -473,11 +473,11 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   // Els colors dels cables s'han de distingir encara que l'alarma ho tenyeixi tot de vermell:
   // es llegeix el color de la pantalla al mig de cada cable, sense alarma i amb l'alarma al màxim.
   await veu(p, 'cables');
-  const colorsCables = async () => {
+  const colorsCables = async (pitjor = false) => {
     const cs = await p.evaluate(() => [...document.querySelectorAll('[data-instancia="cables"] .cable')].map((c) => {
       const r = c.getBoundingClientRect(); return { color: c.dataset.color, x: r.x + r.width / 2, y: r.y + r.height * 0.45 };
     }));
-    const px = await p.evaluate((pts) => window.__esc.llegeixColors(pts), cs.map((c) => [c.x, c.y]));
+    const px = await p.evaluate(([pts, pj]) => window.__esc.llegeixColors(pts, { pitjor: pj }), [cs.map((c) => [c.x, c.y]), pitjor]);
     return cs.map((c, i) => ({ color: c.color, rgb: px[i] }));
   };
   const separacio = (llista) => {
@@ -493,7 +493,8 @@ const { servidor, CAPTURES, proves, cara, depressa, quieta, gira, caraDe, veu, l
   await p.evaluate(() => window.__atura());
   await captura(p, 'tensio');
   await p.waitForFunction(() => Number(document.querySelector('#temps').dataset.tensio) > 0.9, null, { timeout: 15000 });
-  const alarma = await colorsCables();
+  // Al pic del batec de l'alarma, que és quan més tenyeix (abans depenia del moment en què es feia la foto).
+  const alarma = await colorsCables(true);
   const [sc, sa] = [separacio(calma), separacio(alarma)];
   if (sc < Infinity) {
     assert(sa >= 40 && sa >= sc * 0.5, `amb l'alarma, els colors dels cables es confonen: ${sa.toFixed(0)} (sense alarma ${sc.toFixed(0)}) ${JSON.stringify(alarma)}`);

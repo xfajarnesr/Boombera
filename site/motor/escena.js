@@ -49,10 +49,11 @@ export function creaEscena(canvas, senseMoviment) {
   // Contrallum: retalla les arestes de la bomba sobre la paret fosca.
   const contra = new THREE.DirectionalLight(0xc8d4e0, 0.9); contra.position.set(-3, 9, -9); scene.add(contra);
 
-  // Les alarmes són als costats i una mica per darrere: tenyeixen la paret i els cantells, i deixen llegir els mòduls.
+  // Les alarmes són darrere la bomba, entre la bomba i la paret: fan un halo vermell a la paret que retalla la silueta,
+  // però no arriben als mòduls, i els seus colors es continuen llegint encara que tot es torni vermell.
   const alarmes = [-1, 1].map((s) => {
     const l = new THREE.PointLight(0xff1208, 0, 34, 1.5);
-    l.position.set(s * (AMPLE / 2 + 1.8), ALT / 2 - 0.3, -0.6);
+    l.position.set(s * AMPLE * 0.32, ALT / 2 - 1.6, -5.9);
     scene.add(l);
     return l;
   });
@@ -60,6 +61,7 @@ export function creaEscena(canvas, senseMoviment) {
   // La paret queda prou enrere perquè la bomba hi càpiga quan gira.
   const paret = new THREE.Mesh(new THREE.PlaneGeometry(110, 70), materials().paret);
   paret.position.z = -7; paret.receiveShadow = true; scene.add(paret);
+  paret.material.emissive = new THREE.Color(0x5a0700); paret.material.emissiveIntensity = 0;
 
   // El gir es fa sobre el centre de la bomba: «eix» és el pivot, «arrel» porta la bomba amb la cara del davant a z = 0.
   const eix = new THREE.Group(); eix.position.z = -FONS / 2; scene.add(eix);
@@ -287,7 +289,7 @@ export function creaEscena(canvas, senseMoviment) {
     const fase = (Math.sin(t * bpm / 60 * Math.PI * 2) + 1) / 2;
     const quant = estat === 'joc' ? intensitat * intensitat : 0;
     const puls = senseMoviment ? 0.7 : fase;
-    alarmes.forEach((l) => { l.intensity = quant * (140 + 660 * puls) + (estat === 'joc' ? 12 : 0); });
+    posaAlarmes(quant, puls);
     // La llum dura baixa poc amb l'alarma, perquè els colors dels mòduls es continuïn llegint.
     clau.intensity = estat === 'petada' ? 170 : estat === 'salvada' ? 460 : 400 * (1 - quant * 0.3);
     (vista.balises || []).forEach((m) => {
@@ -310,6 +312,14 @@ export function creaEscena(canvas, senseMoviment) {
     // no s'està armant i la càmera no s'està apropant a cap zona.
     const quieta = String(entrada >= 1 && !G.girant && estat !== 'petada' && !A.actiu && !Z.actiu);
     if (canvas.dataset.quieta !== quieta) canvas.dataset.quieta = quieta;
+  }
+
+  // L'alarma batega: «puls» va de 0 a 1. Les balises de la bomba fan el mateix.
+  // La llum vermella que arriba a la bomba és poca (només marca els cantells); el vermell que guanya terreny
+  // és sobretot la paret, que s'encén ella mateixa i no tenyeix els colors dels mòduls.
+  function posaAlarmes(quant, puls) {
+    alarmes.forEach((l) => { l.intensity = quant * (40 + 180 * puls) + (estat === 'joc' ? 4 : 0); });
+    paret.material.emissiveIntensity = quant * (0.35 + 0.65 * puls);
   }
 
   /* ---------- Armat ---------- */
@@ -557,7 +567,9 @@ export function creaEscena(canvas, senseMoviment) {
       return { ...ultimaMesura, grao: grao(), nomGrao: GRAONS[grao()].nom, forcat: graoForcat !== null, crides: renderer.info.render.calls, triangles: renderer.info.render.triangles, gpu, mida: `${renderer.domElement.width}×${renderer.domElement.height}` };
     },
     // Per a les proves: dibuixa i llegeix el color de la pantalla en uns quants punts (coordenades CSS).
-    llegeixColors(punts) {
+    // «pitjor»: amb l'alarma al pic del batec, que és quan més tenyeix.
+    llegeixColors(punts, { pitjor = false } = {}) {
+      if (pitjor && estat === 'joc') posaAlarmes(intensitat * intensitat, 1);
       renderer.render(scene, camera);
       const gl = renderer.getContext(); const k = renderer.getPixelRatio(); const h = renderer.domElement.height;
       const px = new Uint8Array(4);
