@@ -218,9 +218,15 @@ body[data-panell="portada"] #controls { z-index: 10; }
 #portada-equip span { font: 700 13px var(--titols); text-transform: uppercase; letter-spacing: .06em; color: #9ea29c; }
 #portada-equip b { font: 700 19px var(--titols); color: #fff; }
 #portada-equip i { font-style: normal; color: #ffd796; }
-#portada-manual { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px; color: #cfd2cc; font-size: 16px; text-decoration: underline; text-underline-offset: 3px; }
-#portada-manual:hover, #portada-manual:focus-visible { color: #fff; }
-#portada-manual svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* El manual és el segon botó de la portada: gran, perquè la Guia el trobi i el baixi de seguida. */
+#portada-manual {
+  display: inline-flex; align-items: center; gap: 12px; min-height: 52px; min-width: 190px; padding: 8px 20px 8px 16px; text-align: left; text-decoration: none;
+  background: #0c0d0ee6; color: #eeece4; border: 1px solid #8a8d8b;
+}
+#portada-manual b { display: block; font: 700 clamp(20px, 2.6vw, 26px)/1 var(--titols); text-transform: uppercase; letter-spacing: .06em; }
+#portada-manual small { display: block; margin-top: 3px; font-size: 14px; color: #b9b7af; }
+#portada-manual:hover, #portada-manual:focus-visible { border-color: #fff; color: #fff; }
+#portada-manual svg { flex: none; width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- Com es juga ---------- */
 #com-es-juga { position: absolute; inset: 0; z-index: 12; display: grid; place-items: center; padding: 16px; background: #000000b8; }
@@ -280,7 +286,7 @@ body[data-espera-gir="true"] #gira-mobil { display: flex; }
   #portada { gap: 6px; padding: 10px 16px; }
   .logo { font-size: clamp(40px, 15vh, 80px); }
   .portada-botons { margin-top: 4px; }
-  .portada-botons button { min-height: 46px; min-width: 170px; padding: 8px 20px; }
+  .portada-botons button, #portada-manual { min-height: 46px; min-width: 170px; padding: 6px 18px; }
   .seccio { grid-template-columns: 120px repeat(4, 1fr); }
   .nivell { padding: 5px 7px; }
   .nivell strong { font-size: 19px; }

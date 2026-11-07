@@ -6,8 +6,8 @@
       lema: 'Parla o peta',
       portada: {
         missions: 'Missions',
-        lliure: 'Missió lliure',
         manual: 'Manual per a la Guia',
+        manualDesc: 'Llegeix-lo en pantalla o baixa\'l en PDF',
         manualTitol: 'Obre el manual en una altra pestanya: es pot llegir en pantalla o baixar en PDF',
         comEsJuga: 'Com es juga',
         equip: 'Equip',

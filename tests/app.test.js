@@ -65,11 +65,12 @@ const midaPng = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16
   assert.strictEqual(await p.locator('#portada-logo .logo-visor polygon[fill="#ff2a14"]').count(), 12, 'dos zeros de set segments, amb el del mig apagat');
   assert.strictEqual(await p.textContent('#portada-lema'), 'Parla o peta');
   assert.strictEqual(await p.textContent('#portada-missions'), 'Missions');
-  assert.strictEqual(await p.textContent('#portada-lliure'), 'Missió lliure');
+  assert.strictEqual(await p.locator('#portada-lliure').count(), 0, 'la missió lliure no surt a la portada');
   // El manual es pot obrir des de la portada, abans d'entrar l'equip, en una altra pestanya.
   assert.strictEqual(await p.getAttribute('#portada-manual', 'href'), 'manual/');
   assert.strictEqual(await p.getAttribute('#portada-manual', 'target'), '_blank');
   assert((await p.textContent('#portada-manual')).includes('Manual per a la Guia'));
+  assert((await p.locator('#portada-manual').boundingBox()).height >= 44, 'el manual és un botó gran');
   const respostaManual = await p.request.get(`${base}/manual/`);
   assert.strictEqual(respostaManual.status(), 200, 'la pàgina del manual existeix');
   assert.strictEqual(await p.locator('#gira').isVisible(), false);
@@ -112,13 +113,8 @@ const midaPng = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16
   await p.keyboard.press('Escape');
   await p.waitForFunction(() => document.querySelector('#com-es-juga').hidden);
   assert.strictEqual(await p.evaluate(() => document.body.dataset.panell), 'entra');
-  // La missió lliure no demana equip. Sense equip, «Torna» porta a la portada.
+  // Sense equip, «Torna a l'inici» porta a la portada.
   await p.locator('#entra-torna').click();
-  await panell(p, 'portada');
-  await p.locator('#portada-lliure').click();
-  await panell(p, 'lliure');
-  assert.strictEqual(await visible(p, '#nota'), true);
-  await p.locator('#torna-missions').click();
   await panell(p, 'portada');
   // Cinc tocs al lema de la portada obren el camp del codi; «Tanca» torna a la portada.
   await p.locator('#portada-lema').click({ clickCount: 5 });
@@ -141,7 +137,7 @@ const midaPng = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16
   assert.strictEqual(await visible(p, '#ajuda'), false);
   assert.strictEqual(await visible(p, '#gira-mobil'), false, "en un PC no surt l'avís de girar el mòbil");
   await ctx.close();
-  console.log("Portada: logo, lema, Missions, Missió lliure i el manual en una altra pestanya. El «Com es juga» surt la primera vegada i amb «?», i es pot tornar a la portada.");
+  console.log("Portada: logo, lema, Missions i el manual (un botó gran, en una altra pestanya), sense missió lliure. El «Com es juga» surt la primera vegada i amb «?», i es pot tornar a la portada.");
 
   /* ---------- Mòbil apaïsat ---------- */
   const MOBIL = { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, serviceWorkers: 'block' };

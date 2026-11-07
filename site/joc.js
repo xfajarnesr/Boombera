@@ -314,7 +314,7 @@ const AVISOS = {
 const avis = (sel, err) => { $(sel).textContent = err ? AVISOS[err] || "No s'ha pogut fer. Torneu-ho a provar." : ''; $(sel).dataset.error = err || ''; };
 function campMembre(i) {
   const l = document.createElement('label'); l.className = 'camp membre';
-  l.innerHTML = `<span>Persona ${i + 1}</span><input name="membre" maxlength="${window.BoomberaNucli.LLARGADA.membre}" autocomplete="off" placeholder="Nom de pila i inicial">`;
+  l.innerHTML = `<span>Persona ${i + 1}</span><input name="membre" maxlength="${window.BoomberaNucli.LLARGADA.membre}" autocomplete="off">`;
   $('#nou-membres').appendChild(l);
   $('#mes-membres').hidden = $('#nou-membres').children.length >= window.BoomberaNucli.MEMBRES.max;
   return l.querySelector('input');
@@ -548,7 +548,7 @@ document.addEventListener('fullscreenchange', pintaPantalla);
 pintaPantalla();
 
 /* ---------- Portada ---------- */
-// Penombra amb la bomba al fons, el logo, el lema i dos botons. Surt la primera vegada a cada pestanya.
+// Penombra amb la bomba al fons, el logo, el lema, «Missions» i el manual per a la Guia. Surt la primera vegada a cada pestanya.
 const guarda = (magatzem, k, v) => { try { magatzem.setItem(k, v); } catch { /* navegador sense emmagatzematge */ } };
 const llegeix = (magatzem, k) => { try { return magatzem.getItem(k); } catch { return null; } };
 const portadaVista = () => llegeix(sessionStorage, 'boombera.portada') === '1';
@@ -564,16 +564,14 @@ function lliguesPortada() {
   $('#portada-logo').innerHTML = `<span>B</span>${window.BoomberaLogo.visor()}<span>MBERA</span>`;
   $('#portada-lema').textContent = T.lema;
   $('#portada-missions').textContent = T.portada.missions;
-  $('#portada-lliure').textContent = T.portada.lliure;
-  $('#portada-manual').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h6"/></svg>${T.portada.manual}`;
+  $('#portada-manual').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h6"/></svg><span><b>${T.portada.manual}</b><small>${T.portada.manualDesc}</small></span>`;
   $('#portada-manual').title = T.portada.manualTitol;
-  const surt = (cap) => () => {
+  // La missió lliure no surt a la portada: és a baix de tot de les missions.
+  $('#portada-missions').addEventListener('click', () => {
     guarda(sessionStorage, 'boombera.portada', '1');
-    const ves = () => (cap === 'lliure' ? obreLliure(true) : mostra(panellInicial()));
+    const ves = () => mostra(panellInicial());
     if (llegeix(localStorage, 'boombera.comEsJuga') === '1') ves(); else obreComEsJuga(ves);
-  };
-  $('#portada-missions').addEventListener('click', surt('missions'));
-  $('#portada-lliure').addEventListener('click', surt('lliure'));
+  });
 }
 
 /* ---------- Com es juga ---------- */

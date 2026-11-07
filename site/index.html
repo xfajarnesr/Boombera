@@ -52,10 +52,9 @@
     <p class="lema" id="portada-lema"></p>
     <div class="portada-botons">
       <button type="button" id="portada-missions" class="principal"></button>
-      <button type="button" id="portada-lliure"></button>
+      <a id="portada-manual" href="manual/" target="_blank" rel="noopener"></a>
     </div>
     <p id="portada-equip" hidden></p>
-    <a id="portada-manual" href="manual/" target="_blank" rel="noopener"></a>
   </section>
 
   <div id="com-es-juga" role="dialog" aria-modal="true" aria-labelledby="cej-titol" hidden>
@@ -119,7 +118,7 @@
         <button type="button" id="inverteix" aria-label="Inverteix els rols" title="Inverteix els rols"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg></button>
         <label class="rol"><span class="rol-nom">Guia</span><span class="rol-desc">Té el manual</span><select id="rol-guia"></select></label>
       </div>
-      <div id="rols-afegeix"><label>Algú més <input id="rols-nou" maxlength="20" autocomplete="off" placeholder="Nom de pila i inicial"></label><button type="button" id="rols-afegeix-boto" class="petit">Afegeix-lo a l'equip</button></div>
+      <div id="rols-afegeix"><label>Algú més <input id="rols-nou" maxlength="20" autocomplete="off"></label><button type="button" id="rols-afegeix-boto" class="petit">Afegeix-lo a l'equip</button></div>
       <p class="avis" id="rols-avis" aria-live="polite"></p>
       <div class="accions"><button type="button" id="rols-torna">Torna</button><button type="submit" id="rols-comenca" class="principal">Comença</button></div>
     </form>
