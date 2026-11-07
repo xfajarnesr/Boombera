@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="joc.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
 </head>
-<body data-fase="inici">
+<body data-fase="inici" data-panell="carregant">
 <main id="bomba">
   <canvas id="escena" aria-hidden="true"></canvas>
   <div id="alarma" aria-hidden="true"></div>
@@ -41,9 +41,45 @@
     <h2 id="nota-titol">Boombera</h2>
     <div id="nota-text">
       <p class="lema">Parla o peta</p>
-      <p>Seieu d'esquena. Qui desactiva veu aquesta pantalla, qui fa d'expert té el manual, i només podeu parlar.</p>
+      <p class="intro">Seieu d'esquena. Qui fa d'agent veu aquesta pantalla, qui fa de guia té el manual, i només podeu parlar.</p>
     </div>
-    <div id="tria">
+    <div id="equip-barra" hidden>
+      <p><span class="etiqueta">Equip</span> <b id="equip-nom"></b> <span id="equip-membres"></span></p>
+      <p id="pendents" aria-live="polite"></p>
+      <button type="button" id="canvia-equip">Canvia d'equip</button>
+    </div>
+    <p id="mode-barra" hidden><span id="mode-text"></span> <button type="button" id="surt-mode">Surt</button></p>
+    <div id="entra" hidden>
+      <div class="pestanyes" role="tablist">
+        <button type="button" role="tab" id="pest-nou" aria-selected="true" aria-controls="nou-equip">Nou equip</button>
+        <button type="button" role="tab" id="pest-recupera" aria-selected="false" aria-controls="recupera-equip">Ja tenim equip</button>
+      </div>
+      <form id="nou-equip" role="tabpanel" aria-labelledby="pest-nou">
+        <label class="camp">Nom de l'equip <input id="nou-nom" maxlength="24" autocomplete="off" spellcheck="false"></label>
+        <fieldset><legend>Qui en forma part</legend><div id="nou-membres"></div>
+          <button type="button" id="mes-membres" class="petit">Afegeix una persona</button></fieldset>
+        <div class="accions"><button type="submit" class="principal">Crea l'equip</button></div>
+      </form>
+      <form id="recupera-equip" role="tabpanel" aria-labelledby="pest-recupera" hidden>
+        <label class="camp">Nom de l'equip <input id="recupera-nom" maxlength="24" autocomplete="off" spellcheck="false"></label>
+        <div class="accions"><button type="submit" class="principal">Entra</button></div>
+      </form>
+      <p class="avis" id="entra-avis" aria-live="polite"></p>
+      <button type="button" id="sense-equip" class="enllac">Juga sense desar</button>
+    </div>
+    <form id="rols" hidden>
+      <h3 id="rols-titol"></h3>
+      <p id="rols-missio"></p>
+      <div class="rols-fila">
+        <label class="rol"><span class="rol-nom">Agent</span><span class="rol-desc">Té la bomba</span><select id="rol-agent"></select></label>
+        <button type="button" id="inverteix" aria-label="Inverteix els rols" title="Inverteix els rols"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg></button>
+        <label class="rol"><span class="rol-nom">Guia</span><span class="rol-desc">Té el manual</span><select id="rol-guia"></select></label>
+      </div>
+      <div id="rols-afegeix"><label>Algú més <input id="rols-nou" maxlength="20" autocomplete="off" placeholder="Nom de pila i inicial"></label><button type="button" id="rols-afegeix-boto" class="petit">Afegeix-lo a l'equip</button></div>
+      <p class="avis" id="rols-avis" aria-live="polite"></p>
+      <div class="accions"><button type="button" id="rols-torna">Torna</button><button type="submit" id="rols-comenca" class="principal">Comença</button></div>
+    </form>
+    <div id="tria" hidden>
       <div id="nivells"></div>
       <button type="button" id="obre-lliure" class="lliure-boto">Missió lliure<span>Tria els mòduls, el temps i els errors</span></button>
     </div>
@@ -61,10 +97,18 @@
         <button type="submit" id="comenca-lliure">Comença</button>
       </div>
     </form>
+    <form id="codi" hidden>
+      <label class="camp">Codi <input id="codi-text" autocomplete="off" spellcheck="false"></label>
+      <div class="accions"><button type="button" id="codi-tanca">Tanca</button><button type="submit" class="principal">D'acord</button></div>
+      <p class="avis" id="codi-avis" aria-live="polite"></p>
+    </form>
   </section>
   <p id="sense3d" hidden>Aquest ordinador no pot mostrar gràfics 3D. Prova-ho amb un altre navegador o activa l'acceleració gràfica.</p>
 </main>
 <script src="comu/regles.js"></script>
+<script src="comu/config.js"></script>
+<script src="comu/codis.js"></script>
+<script src="dades/nucli.js"></script>
 <script type="module" src="joc.js"></script>
 </body>
 </html>

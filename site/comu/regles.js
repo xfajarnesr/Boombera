@@ -57,6 +57,17 @@
     return { nom: 'Missió lliure', codi: 'lliure', lliure: true, segons, errors, moduls: MODULS_TOTS.filter((x) => ms.includes(x)) };
   }
 
+  // Progrés: la secció 1 és oberta, i cada secció s'obre quan se n'han superat tres de l'anterior, les que siguin.
+  // Una secció on ja s'ha superat alguna missió també queda oberta. La missió lliure només porta mòduls de seccions obertes.
+  const PROGRES = { perObrir: 3 };
+  function seccionsObertes(superades) {
+    const fet = new Set(superades);
+    const compte = (s) => SECCIONS[s - 1].missions.filter((_, j) => fet.has(`${s}.${j + 1}`)).length;
+    return SECCIONS.map((_, i) => i + 1).filter((s) => s === 1 || compte(s - 1) >= PROGRES.perObrir || compte(s) > 0);
+  }
+  const missionsObertes = (superades) => { const o = seccionsObertes(superades); return NIVELLS.filter((n) => o.includes(n.seccio)).map((n) => n.codi); };
+  const modulsOberts = (superades) => { const o = seccionsObertes(superades); return MODULS_TOTS.filter((m) => NIVELLS.some((n) => o.includes(n.seccio) && n.moduls.includes(m))); };
+
   // Cada mòdul de la bomba té un identificador: el nom, i si surt dues vegades, la segona és «nom-2».
   const instancies = (moduls) => {
     const vistos = {};
@@ -502,7 +513,7 @@
     VERSIO, PARTIDA, NIVELLS, COLORS_CABLE, COLORS_BOTO, PARAULES, ETIQUETES, LLETRES, TALLS,
     REGLES_CABLES, REGLES_BOTO, LLUMS, senseMesDeDos,
     reglaCables, solucioCables, solucioBoto, generaBomba, generaRanures, repartimentEspais,
-    MODULS: MODULS_TOTS, NOMS_MODULS, SECCIONS, LLIURE, missioLliure, instancies, generaModul,
+    MODULS: MODULS_TOTS, NOMS_MODULS, SECCIONS, LLIURE, missioLliure, PROGRES, seccionsObertes, missionsObertes, modulsOberts, instancies, generaModul,
     SEQUENCIA, saltsSequencia, sentitSequencia, respostaSequencia,
     MEMORIA, CATEGORIES_MEMORIA, REGLES_MEMORIA, categoriaMemoria, textMemoria, solucioMemoria,
     CONTRASENYA, paraulesDeRodets, triaContrasenya, solucioContrasenya,

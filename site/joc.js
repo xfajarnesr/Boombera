@@ -2,13 +2,15 @@
 import { creaEscena } from './motor/escena.js';
 import { creaSo } from './motor/so.js';
 import { MODULS } from './moduls/registre.js';
+import { creaDades, quinCodi, modeDesat, desaMode } from './dades/dades.js';
 
 const R = window.Curtcircuit;
 const $ = (s) => document.querySelector(s);
 const senseMoviment = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const so = creaSo();
+const dades = creaDades();
 
-const S = { fase: 'inici', nivell: R.NIVELLS[0], b: null, inst: [], ids: [], finalMs: 0, errors: 0, fets: new Set(), controls: [], ultim: null, quiet: 0 };
+const S = { mode: null, convidat: null, rols: null, fase: 'inici', nivell: R.NIVELLS[0], b: null, inst: [], ids: [], finalMs: 0, errors: 0, fets: new Set(), controls: [], ultim: null, quiet: 0 };
 const restantMs = () => (S.fase === 'joc' ? S.finalMs - performance.now() : S.quiet);
 const totalSegons = () => Math.max(0, Math.ceil(restantMs() / 1000));
 const format = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -25,7 +27,8 @@ async function arrenca() {
     return;
   }
   novaBomba(R.NIVELLS[R.NIVELLS.length - 1]);
-  pintaNivells();
+  S.mode = await modeDesat();
+  preparaInici();
 }
 
 function novaBomba(nivell) {
@@ -177,6 +180,7 @@ function esquerdes() {
 function acaba(guanya, motiu = '') {
   S.quiet = restantMs();
   const t = totalSegons();
+  const res = desaPartida(guanya, t);
   S.fase = 'fi';
   aturaModuls();
   document.body.dataset.fase = guanya ? 'salvada' : 'petada';
@@ -184,9 +188,12 @@ function acaba(guanya, motiu = '') {
   $('#estat').textContent = guanya ? 'Bomba desactivada' : 'Bomba explotada';
   const errs = S.errors === 1 ? '1 error' : `${S.errors} errors`;
   $('#nota-titol').textContent = guanya ? 'Bomba desactivada' : 'Ha petat';
+  const despres = res ? res.text : ' Canvieu els papers i trieu missió.';
   $('#nota-text').innerHTML = guanya
-    ? `<p>Marge de ${format(t)} i ${errs}. Canvieu els papers i trieu missió.</p>`
-    : `<p>${motiu} Canvieu els papers i trieu missió.</p>`;
+    ? `<p>Marge de ${format(t)} i ${errs}.${despres}</p>`
+    : `<p>${motiu}${despres}</p>`;
+  pintaInici();
+  mostra('missions');
   if (guanya) {
     esc.salvada(); so.guanya();
     $('#nota').hidden = false;
@@ -194,31 +201,273 @@ function acaba(guanya, motiu = '') {
     const o = esc.origenDe(S.ids.find((m) => !S.fets.has(m)) || S.ids[0]).clone(); o.z = 1;
     esc.explota(o); so.explosio();
     esquerdes();
-    setTimeout(() => { $('#nota').hidden = false; const b = document.querySelector('.nivell'); if (b) b.focus(); }, senseMoviment ? 300 : 3200);
+    setTimeout(() => { $('#nota').hidden = false; const b = document.querySelector('.nivell:not(:disabled)'); if (b) b.focus(); }, senseMoviment ? 300 : 3200);
   }
   document.querySelectorAll('.diana').forEach((d) => { d.disabled = true; });
 }
 
+/* ---------- Equip, progrés i modes ---------- */
+// Sense equip es pot jugar igual: el progrés només dura mentre la pestanya és oberta.
+// Mode obert (codi del professorat): totes les missions obertes, i es desa. Mode demostració: tot obert, sense equip i sense desar.
+const ambEquip = () => S.mode !== 'demo' && Boolean(dades.equip);
+const superades = () => (S.mode === 'demo' ? [] : dades.equip ? dades.superades() : [...(S.convidat || [])]);
+const millors = () => (ambEquip() ? dades.millors() : {});
+const totObert = () => S.mode === 'obre' || S.mode === 'demo';
+const missionsObertes = () => new Set(totObert() ? R.NIVELLS.map((n) => n.codi) : R.missionsObertes(superades()));
+const modulsOberts = () => (totObert() ? R.MODULS : R.modulsOberts(superades()));
+const seccionsObertes = () => (totObert() ? R.SECCIONS.map((_, i) => i + 1) : R.seccionsObertes(superades()));
+
+const PANELLS = { entra: '#entra', missions: '#tria', rols: '#rols', lliure: '#lliure', codi: '#codi' };
+function mostra(panell) {
+  Object.entries(PANELLS).forEach(([k, sel]) => { $(sel).hidden = k !== panell; });
+  document.body.dataset.panell = panell;
+  $('#equip-barra').hidden = !ambEquip() || panell === 'entra';
+  const focus = { entra: '#entra form:not([hidden]) input', rols: '#rols-comenca', lliure: '#lliure input:not(:disabled)', codi: '#codi-text' }[panell];
+  if (focus && !$('#nota').hidden && $(focus)) $(focus).focus();
+}
+const panellInicial = () => (S.mode === 'demo' || dades.equip || S.convidat ? 'missions' : 'entra');
+
+function preparaInici() {
+  pintaInici();
+  lliguesMissions();
+  lliguesEntra();
+  lliguesRols();
+  lliguesCodi();
+  pintaLliure();
+  dades.escolta(() => { if (S.fase !== 'joc') pintaInici(); });
+  if (lliureDeUrl() && panellInicial() === 'missions') obreLliure(true);
+  else mostra(panellInicial());
+}
+const lliureDeUrl = () => { const q = new URLSearchParams(location.search); return q.has('m') ? R.missioLliure(q.get('m').split(','), Number(q.get('t')), Number(q.get('e'))) : null; };
+const escapa = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function pintaInici() {
+  const e = ambEquip() ? dades.equip : null;
+  if (e) { $('#equip-nom').textContent = e.nom; $('#equip-membres').textContent = e.membres.join(', '); }
+  const n = dades.remot ? dades.pendents() : 0;
+  $('#pendents').textContent = n ? `${n === 1 ? '1 partida' : `${n} partides`} per enviar al full: s'enviaran quan hi hagi connexió.` : '';
+  $('#pendents').dataset.n = n;
+  $('#mode-barra').hidden = !S.mode;
+  $('#mode-text').textContent = S.mode === 'demo' ? 'Mode demostració: tot obert, no es desa res.' : S.mode === 'obre' ? 'Mode obert: totes les missions.' : '';
+  document.body.dataset.mode = S.mode || '';
+  $('#equip-barra').hidden = !e || document.body.dataset.panell === 'entra';
+  pintaNivells();
+  pintaXipsLliure();
+}
+
 /* ---------- Missions ---------- */
 const errorsText = (n) => (n === 1 ? '1 error' : `${n} errors`);
+const CADENAT = '<svg class="cadenat" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 function pintaNivells() {
-  $('#nivells').innerHTML = R.SECCIONS.map((sec, i) => `<div class="seccio"><h3><b>${i + 1}</b>${sec.nom}</h3>${
-    R.NIVELLS.map((n, k) => [n, k]).filter(([n]) => n.seccio === i + 1).map(([n, k]) => `<button type="button" class="nivell" data-nivell="${k}" data-codi="${n.codi}" aria-label="${n.nom}: ${n.moduls.length} mòduls, ${format(n.segons)}, peta amb ${errorsText(n.errors)}"><strong>${n.codi}</strong><span>${n.moduls.length} mòduls</span><span>${format(n.segons)} · ${errorsText(n.errors)}</span></button>`).join('')
-  }</div>`).join('');
+  const obertes = missionsObertes(); const m = millors(); const fet = new Set(superades());
+  const mostraFet = ambEquip() || Boolean(S.convidat);
+  $('#nivells').innerHTML = R.SECCIONS.map((sec, i) => {
+    const s = i + 1;
+    const compte = sec.missions.filter((_, j) => fet.has(`${s}.${j + 1}`)).length;
+    const oberta = seccionsObertes().includes(s);
+    const sota = !oberta ? `<small class="compte">Supera'n ${R.PROGRES.perObrir} de la ${s - 1}</small>` : mostraFet ? `<small class="compte">${compte}/${sec.missions.length}</small>` : '';
+    return `<div class="seccio" data-seccio="${s}" data-oberta="${oberta}"><h3><b>${s}</b>${sec.nom}${sota}</h3>${
+      R.NIVELLS.map((n, k) => [n, k]).filter(([n]) => n.seccio === s).map(([n, k]) => {
+        const bloc = !obertes.has(n.codi);
+        const millor = m[n.codi]; const sup = fet.has(n.codi);
+        const etiqueta = `${n.nom}: ${n.moduls.length} mòduls, ${format(n.segons)}, peta amb ${errorsText(n.errors)}`
+          + (bloc ? `. Bloquejada: cal superar ${R.PROGRES.perObrir} missions de la secció ${s - 1}` : '')
+          + (sup ? `. Superada${millor ? `, millor marge ${format(millor.marge)} amb ${errorsText(millor.errors)}` : ''}` : '');
+        const peu = bloc ? `<span class="bloc">${CADENAT}</span>`
+          : `<span>${n.moduls.length} mòduls</span><span>${format(n.segons)} · ${errorsText(n.errors)}</span>`
+            + (millor ? `<span class="millor" data-marge="${millor.marge}" data-errors="${millor.errors}">${format(millor.marge)} · ${errorsText(millor.errors)}</span>` : '');
+        return `<button type="button" class="nivell" data-nivell="${k}" data-codi="${n.codi}" data-bloquejada="${bloc}" data-superada="${sup}"${bloc ? ' disabled' : ''} aria-label="${etiqueta}"><strong>${n.codi}${sup ? '<i class="fet" aria-hidden="true"></i>' : ''}</strong>${peu}</button>`;
+      }).join('')
+    }</div>`;
+  }).join('');
+}
+function lliguesMissions() {
   $('#nivells').addEventListener('click', (e) => {
     const b = e.target.closest('.nivell');
-    if (b) comenca(R.NIVELLS[Number(b.dataset.nivell)]);
+    if (!b || b.disabled) return;
+    const n = R.NIVELLS[Number(b.dataset.nivell)];
+    if (ambEquip()) obreRols(n); else { S.rols = null; comenca(n); }
   });
-  pintaLliure();
+}
+
+/* ---------- Nou equip o equip que ja existeix ---------- */
+const AVISOS = {
+  existeix: "Ja hi ha un equip amb aquest nom (o gairebé igual). Si és el vostre, entreu per «Ja tenim equip». Si no, trieu-ne un altre.",
+  'no-existeix': "No hi ha cap equip amb aquest nom. Repasseu com l'havíeu escrit.",
+  'nom-curt': "El nom de l'equip ha de tenir com a mínim dues lletres.",
+  'pocs-membres': "Cal que l'equip tingui com a mínim dues persones.",
+  'massa-membres': `Un equip pot tenir com a molt ${window.BoomberaNucli.MEMBRES.max} persones.`,
+  repetit: "Aquesta persona ja és a l'equip.",
+  xarxa: "Ara no hi ha connexió amb el full de dades. Torneu-ho a provar d'aquí a una estona, o jugueu sense desar.",
+};
+const avis = (sel, err) => { $(sel).textContent = err ? AVISOS[err] || "No s'ha pogut fer. Torneu-ho a provar." : ''; $(sel).dataset.error = err || ''; };
+function campMembre(i) {
+  const l = document.createElement('label'); l.className = 'camp membre';
+  l.innerHTML = `<span>Persona ${i + 1}</span><input name="membre" maxlength="${window.BoomberaNucli.LLARGADA.membre}" autocomplete="off" placeholder="Nom de pila i inicial">`;
+  $('#nou-membres').appendChild(l);
+  $('#mes-membres').hidden = $('#nou-membres').children.length >= window.BoomberaNucli.MEMBRES.max;
+  return l.querySelector('input');
+}
+function lliguesEntra() {
+  for (let i = 0; i < window.BoomberaNucli.MEMBRES.min; i++) campMembre(i);
+  const pestanya = (nou) => {
+    $('#nou-equip').hidden = !nou; $('#recupera-equip').hidden = nou;
+    $('#pest-nou').setAttribute('aria-selected', String(nou)); $('#pest-recupera').setAttribute('aria-selected', String(!nou));
+    avis('#entra-avis', null);
+    (nou ? $('#nou-nom') : $('#recupera-nom')).focus();
+  };
+  $('#pest-nou').addEventListener('click', () => pestanya(true));
+  $('#pest-recupera').addEventListener('click', () => pestanya(false));
+  $('#mes-membres').addEventListener('click', () => campMembre($('#nou-membres').children.length).focus());
+  const espera = async (form, f) => {
+    const bt = form.querySelector('[type="submit"]'); bt.disabled = true; form.setAttribute('aria-busy', 'true');
+    try { return await f(); } finally { bt.disabled = false; form.removeAttribute('aria-busy'); }
+  };
+  const entra = (r) => {
+    avis('#entra-avis', r.ok ? null : r.error);
+    if (!r.ok) return;
+    S.convidat = null;
+    pintaInici();
+    obreLliure(Boolean(lliureDeUrl()));
+  };
+  $('#nou-equip').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const membres = [...$('#nou-membres').querySelectorAll('input')].map((i) => i.value);
+    entra(await espera(e.target, () => dades.creaEquip($('#nou-nom').value, membres)));
+  });
+  $('#recupera-equip').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    entra(await espera(e.target, () => dades.recuperaEquip($('#recupera-nom').value)));
+  });
+  $('#sense-equip').addEventListener('click', () => { S.convidat = new Set(); pintaInici(); mostra('missions'); });
+  $('#canvia-equip').addEventListener('click', () => {
+    dades.surt(); S.convidat = null;
+    $('#nou-equip').reset(); $('#recupera-equip').reset();
+    $('#nota-titol').textContent = 'Boombera';
+    pintaInici(); mostra('entra');
+  });
+}
+
+/* ---------- Rols: qui fa d'agent i qui fa de guia ---------- */
+// Per defecte, la persona que feia de guia passa a fer d'agent, i fa de guia la següent de la llista.
+// Amb dos membres, els rols s'intercanvien; amb tres o quatre, tothom va passant pels dos rols.
+function rolsPerDefecte(e) {
+  const m = e.membres; const g = m.indexOf(e.guia);
+  if (g < 0) return { agent: m[0], guia: m[1] };
+  const agent = m[g];
+  const guia = m[(g + 1) % m.length];
+  return { agent, guia };
+}
+const rolsDespres = (agent, guia) => rolsPerDefecte({ membres: dades.equip.membres, guia, agent });
+let rolsNivell = null;
+function pintaRols(r) {
+  const opcions = (tria) => dades.equip.membres.map((x) => `<option value="${escapa(x)}"${x === tria ? ' selected' : ''}>${escapa(x)}</option>`).join('');
+  $('#rol-agent').innerHTML = opcions(r.agent); $('#rol-guia').innerHTML = opcions(r.guia);
+  $('#rols-afegeix').hidden = dades.equip.membres.length >= window.BoomberaNucli.MEMBRES.max;
+  comprovaRols();
+}
+function comprovaRols() {
+  const igual = $('#rol-agent').value === $('#rol-guia').value;
+  $('#rols-avis').textContent = igual ? 'Cal una persona diferent a cada rol.' : '';
+  $('#rols-comenca').disabled = igual;
+}
+function obreRols(n) {
+  rolsNivell = n;
+  $('#rols-titol').textContent = `Missió ${n.codi}`;
+  $('#rols-missio').textContent = `${n.moduls.length} mòduls · ${format(n.segons)} · peta amb ${errorsText(n.errors)}. Qui fa cada rol?`;
+  pintaRols(rolsPerDefecte(dades.equip));
+  mostra('rols');
+}
+function lliguesRols() {
+  $('#rol-agent').addEventListener('change', comprovaRols);
+  $('#rol-guia').addEventListener('change', comprovaRols);
+  $('#inverteix').addEventListener('click', () => pintaRols({ agent: $('#rol-guia').value, guia: $('#rol-agent').value }));
+  $('#rols-torna').addEventListener('click', () => mostra('missions'));
+  $('#rols-afegeix-boto').addEventListener('click', async () => {
+    const nom = $('#rols-nou').value;
+    if (!nom.trim()) return;
+    const abans = { agent: $('#rol-agent').value, guia: $('#rol-guia').value };
+    const r = await dades.afegeixMembre(nom);
+    if (!r.ok) { $('#rols-avis').textContent = AVISOS[r.error] || "No s'ha pogut afegir."; return; }
+    $('#rols-nou').value = '';
+    pintaRols(abans);
+  });
+  $('#rols').addEventListener('submit', (e) => {
+    e.preventDefault();
+    comprovaRols();
+    if ($('#rols-comenca').disabled) return;
+    S.rols = { agent: $('#rol-agent').value, guia: $('#rol-guia').value };
+    comenca(rolsNivell);
+  });
+}
+
+// En acabar una missió, es desa (si hi ha equip) i es diu què canvia: missió superada, rècord, secció nova i qui fa què ara.
+function desaPartida(guanya, t) {
+  const n = S.nivell;
+  if (n.lliure || S.mode === 'demo') return null;
+  const obertesAbans = seccionsObertes();
+  let text = '';
+  if (ambEquip()) {
+    const rols = S.rols || rolsPerDefecte(dades.equip);
+    const r = dades.registra({ missio: n.codi, guanyada: guanya, errors: S.errors, marge: guanya ? t : 0, agent: rols.agent, guia: rols.guia, versio: R.VERSIO });
+    if (r.primera) text += ' Missió superada!';
+    else if (r.record) text += ' Nou rècord!';
+    const novaSec = seccionsObertes().filter((s) => !obertesAbans.includes(s));
+    novaSec.forEach((s) => { text += ` S'ha obert la secció ${s}: ${R.SECCIONS[s - 1].nom}.`; });
+    const ara = rolsDespres(rols.agent, rols.guia);
+    text += ` Ara canvieu: ${escapa(ara.agent)} a la bomba i ${escapa(ara.guia)} amb el manual.`;
+    $('#nota-text').dataset.record = String(r.record); $('#nota-text').dataset.seccions = novaSec.join(' ');
+  } else if (S.convidat) {
+    if (guanya) S.convidat.add(n.codi);
+    const novaSec = seccionsObertes().filter((s) => !obertesAbans.includes(s));
+    novaSec.forEach((s) => { text += ` S'ha obert la secció ${s}: ${R.SECCIONS[s - 1].nom}.`; });
+    text += ' Canvieu els papers i trieu missió.';
+  } else return null;
+  return { text };
+}
+
+/* ---------- Codis ocults ---------- */
+// Cinc tocs seguits al lema, o Ctrl + Alt + B a la pantalla d'inici, obren un camp per escriure un codi.
+function lliguesCodi() {
+  let tocs = []; let abans = 'missions';
+  const obre = () => { if (S.fase === 'joc' || document.body.dataset.panell === 'codi') return; abans = document.body.dataset.panell; $('#codi').reset(); avis('#codi-avis', null); mostra('codi'); };
+  $('#nota').addEventListener('click', (e) => {
+    if (!e.target.closest('.lema')) return;
+    const ara = performance.now(); tocs = tocs.filter((x) => ara - x < 2500); tocs.push(ara);
+    if (tocs.length >= 5) { tocs = []; obre(); }
+  });
+  document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); obre(); } });
+  $('#codi-tanca').addEventListener('click', () => mostra(abans === 'codi' ? panellInicial() : abans));
+  $('#codi').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = $('#codi-text').value;
+    const k = await quinCodi(text);
+    if (!k) { $('#codi-avis').textContent = 'Aquest codi no fa res.'; $('#codi-avis').dataset.error = 'codi'; return; }
+    if (k === 'tauler') { location.href = 'tauler/index.html'; return; }
+    desaMode(text); S.mode = k;
+    pintaInici(); mostra(panellInicial());
+  });
+  $('#surt-mode').addEventListener('click', () => { desaMode(null); S.mode = null; pintaInici(); mostra(panellInicial()); });
 }
 
 /* ---------- Missió lliure ---------- */
 // La configuració va a l'enllaç (?m=cables,boto&t=300&e=3): es pot compartir sense desar res.
+// Només s'hi poden triar els mòduls de les seccions obertes.
+let iniLliure = null;
+function pintaXipsLliure() {
+  const oberts = new Set(modulsOberts());
+  const marcats = new Set([...document.querySelectorAll('#lliure-moduls input:checked')].map((i) => i.value));
+  const ini = iniLliure ? new Set(iniLliure.moduls) : marcats;
+  $('#lliure-moduls').innerHTML = R.MODULS.map((m) => {
+    const ok = oberts.has(m);
+    return `<label class="xip${ok ? '' : ' tancat'}" data-modul="${m}"${ok ? '' : ' title="Encara no hi heu arribat"'}><input type="checkbox" name="modul" value="${m}"${ok && ini.has(m) ? ' checked' : ''}${ok ? '' : ' disabled'}> ${ok ? '' : CADENAT}${R.NOMS_MODULS[m]}</label>`;
+  }).join('');
+  iniLliure = null;
+}
 function pintaLliure() {
-  const q = new URLSearchParams(location.search);
-  const deUrl = q.has('m') ? R.missioLliure(q.get('m').split(','), Number(q.get('t')), Number(q.get('e'))) : null;
+  const deUrl = lliureDeUrl();
   const ini = deUrl || { moduls: [], ...R.LLIURE.perDefecte };
-  $('#lliure-moduls').innerHTML = R.MODULS.map((m) => `<label class="xip"><input type="checkbox" name="modul" value="${m}"${ini.moduls.includes(m) ? ' checked' : ''}> ${R.NOMS_MODULS[m]}</label>`).join('');
+  iniLliure = ini;
+  pintaXipsLliure();
   $('#lliure-temps').innerHTML = R.LLIURE.segons.map((t) => `<option value="${t}"${t === ini.segons ? ' selected' : ''}>${format(t)}</option>`).join('');
   $('#lliure-errors').innerHTML = R.LLIURE.errors.map((n) => `<label class="xip"><input type="radio" name="errors" value="${n}"${n === ini.errors ? ' checked' : ''}> ${n}</label>`).join('');
   const f = $('#lliure');
@@ -230,12 +479,12 @@ function pintaLliure() {
     desaUrl(m);
     try { await navigator.clipboard.writeText(location.href); $('#lliure-avis').textContent = 'Enllaç copiat.'; } catch { $('#lliure-avis').textContent = `Copieu l'enllaç de la barra d'adreces.`; }
   });
-  f.addEventListener('submit', (e) => { e.preventDefault(); const m = llegeixLliure(); if (m) comenca(m); else avisLliure(m); });
-  if (deUrl) obreLliure(true);
+  f.addEventListener('submit', (e) => { e.preventDefault(); const m = llegeixLliure(); if (m) { S.rols = null; comenca(m); } else avisLliure(m); });
+  if (deUrl && deUrl.moduls.some((m) => !modulsOberts().includes(m))) $('#lliure-avis').textContent = "Alguns mòduls de l'enllaç encara no són oberts per a vosaltres.";
 }
 function llegeixLliure() {
   const f = $('#lliure');
-  const moduls = [...f.querySelectorAll('input[name="modul"]:checked')].map((i) => i.value);
+  const moduls = [...f.querySelectorAll('input[name="modul"]:checked:not(:disabled)')].map((i) => i.value);
   const e = f.querySelector('input[name="errors"]:checked');
   return R.missioLliure(moduls, Number($('#lliure-temps').value), e ? Number(e.value) : 0);
 }
@@ -246,9 +495,8 @@ function desaUrl(m) {
   try { history.replaceState(null, '', u); } catch { /* en una pàgina incrustada pot no deixar-ho */ }
 }
 function obreLliure(obre) {
-  $('#lliure').hidden = !obre; $('#tria').hidden = obre;
-  document.body.dataset.panell = obre ? 'lliure' : 'missions';
-  (obre ? $('#lliure input') : $('#obre-lliure')).focus();
+  mostra(obre ? 'lliure' : 'missions');
+  if (!obre) $('#obre-lliure').focus();
 }
 
 /* ---------- So ---------- */

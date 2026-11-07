@@ -1,0 +1,39 @@
+/* Tauler del professorat: el mateix blindatge fosc del joc, però per llegir dades. */
+body { background: #0a0b0c; color: #eeece4; font-family: var(--text); margin: 0; padding: 20px clamp(12px, 3vw, 36px) 40px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; border-bottom: 3px solid #ff2a14; padding-bottom: 10px; margin-bottom: 16px; }
+h1 { font-family: var(--estargit); font-weight: 400; font-size: 40px; margin: 0; }
+h1 span { font: 700 20px var(--titols); text-transform: uppercase; letter-spacing: .05em; color: #cfd2cc; margin-left: 8px; }
+#origen { margin: 0; color: #9ea29c; font-size: 15px; }
+label { display: inline-flex; flex-direction: column; gap: 4px; font: 700 14px var(--titols); text-transform: uppercase; letter-spacing: .04em; color: #cfd2cc; }
+label.marca { flex-direction: row; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font: 15px var(--text); }
+input, select { font: 16px var(--text); background: #1b1d1f; color: #fff; border: 1px solid #5c5f5f; padding: 7px 9px; }
+button { font: 700 16px var(--titols); text-transform: uppercase; letter-spacing: .03em; background: #1b1d1f; color: #fff; border: 1px solid #5c5f5f; padding: 8px 14px; cursor: pointer; }
+button:hover, button:focus-visible { border-color: #fff; }
+:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+button.perill { border-color: #a3271b; }
+button.perill[data-segur="true"] { background: #ff2a14; border-color: #ff2a14; }
+button.petit { font-size: 13px; padding: 4px 8px; }
+#entra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; max-width: 640px; }
+#entra[hidden], #dades[hidden], #detall[hidden] { display: none; }
+.avis { color: #ffb3a8; flex-basis: 100%; margin: 0; min-height: 1.3em; }
+.eines { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-bottom: 10px; }
+#resum { color: #cfd2cc; margin: 0 0 8px; }
+.taula { overflow-x: auto; border: 1px solid #3c3f40; }
+table { border-collapse: collapse; font-size: 14px; }
+th, td { border: 1px solid #2a2d2e; padding: 4px 4px; text-align: center; white-space: nowrap; }
+thead th { background: #131516; font: 700 14px var(--titols); color: #cfd2cc; position: sticky; top: 0; }
+thead th.sec { color: #fff; border-bottom-color: #ff2a14; }
+tbody th { text-align: left; min-width: 140px; }
+tbody th .nom { background: none; border: 0; padding: 0; font: 700 17px var(--titols); text-transform: none; letter-spacing: 0; color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+tbody th small { display: block; color: #9ea29c; font: 12px var(--text); white-space: normal; }
+td.n { font: 700 17px var(--titols); }
+td.sup { background: #12301f; color: #b8ffd0; font-weight: 700; min-width: 42px; }
+td.sup small, td.no small { display: block; font-weight: 400; font-size: 11px; color: #9ea29c; }
+td.no { color: #7d817c; min-width: 42px; }
+td.data { color: #9ea29c; font-size: 13px; }
+tr.obert th, tr.obert td { outline: 1px solid #ff2a14; }
+.buit { color: #9ea29c; padding: 14px; }
+#detall { margin-top: 18px; padding: 14px 16px; border: 1px solid #5c5f5f; border-top: 4px solid #ff2a14; background: #101112; }
+#detall h2 { font: 700 30px var(--titols); margin: 0 0 4px; text-transform: uppercase; }
+#detall > p { margin: 0 0 12px; color: #cfd2cc; }
+table.partides td { text-align: left; }

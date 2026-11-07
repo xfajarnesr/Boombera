@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Boombera · Tauler</title>
+<link rel="stylesheet" href="../comu/comu.css">
+<link rel="stylesheet" href="tauler.css">
+</head>
+<body data-estat="carregant">
+<header>
+  <h1>Boombera <span>Tauler del professorat</span></h1>
+  <p id="origen"></p>
+</header>
+<main>
+  <form id="entra" hidden>
+    <label>Clau del professorat <input id="clau" type="password" autocomplete="current-password"></label>
+    <label class="marca"><input id="recorda" type="checkbox"> Recorda-la en aquest ordinador</label>
+    <button type="submit">Entra</button>
+    <p id="entra-avis" class="avis" aria-live="polite"></p>
+  </form>
+  <section id="dades" hidden>
+    <div class="eines">
+      <label>Cerca un equip <input id="cerca" type="search" autocomplete="off"></label>
+      <button type="button" id="actualitza">Actualitza</button>
+      <button type="button" id="csv-millors">CSV de millors</button>
+      <button type="button" id="csv-partides">CSV de partides</button>
+      <button type="button" id="oblida" hidden>Oblida la clau</button>
+    </div>
+    <p id="resum" aria-live="polite"></p>
+    <div class="taula"><table id="equips"><thead></thead><tbody></tbody></table></div>
+    <section id="detall" hidden aria-live="polite"></section>
+  </section>
+</main>
+<script src="../comu/regles.js"></script>
+<script src="../comu/config.js"></script>
+<script src="../dades/nucli.js"></script>
+<script type="module" src="tauler.js"></script>
+</body>
+</html>

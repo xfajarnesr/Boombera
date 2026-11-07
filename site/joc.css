@@ -116,3 +116,78 @@ body[data-fase="inici"] #nota, body[data-fase="salvada"] #nota, body[data-fase="
 @media (prefers-reduced-motion: reduce) {
   body[data-fase="petada"] #flaix, body.copet #escena, body[data-fase="petada"] #esquerdes { animation: none; }
 }
+
+/* ---------- Equip, rols, progrés i codis ---------- */
+#equip-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: -6px 0 12px; padding: 8px 10px; border: 1px solid #3c3f40; background: #131516; }
+#equip-barra[hidden], #mode-barra[hidden] { display: none; }
+#equip-barra p { margin: 0; font-size: 16px; }
+#equip-barra .etiqueta { font: 700 13px var(--titols); text-transform: uppercase; letter-spacing: .06em; color: #9ea29c; }
+#equip-barra b { font: 700 20px var(--titols); color: #fff; }
+#equip-membres { color: #cfd2cc; }
+#nota #pendents { flex-basis: 100%; order: 3; font-size: 14px; color: #ffcf8a; }
+#nota #pendents:empty { display: none; }
+#canvia-equip, #surt-mode, .petit, .enllac { background: none; border: 1px solid #5c5f5f; color: #e8e6de; font: 14px var(--text); padding: 5px 10px; cursor: pointer; }
+#canvia-equip { margin-left: auto; }
+#canvia-equip:hover, #surt-mode:hover, .petit:hover, .enllac:hover, #canvia-equip:focus-visible, .petit:focus-visible, .enllac:focus-visible { border-color: #fff; color: #fff; }
+.enllac { border: 0; text-decoration: underline; padding: 4px 0; color: #cfd2cc; }
+#nota #mode-barra { margin: -6px 0 12px; padding: 6px 10px; font-size: 15px; background: #2a1c06; border: 1px solid #a8700f; color: #ffd796; }
+
+#entra .pestanyes { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid #5c5f5f; }
+#entra .pestanyes button { background: none; border: 0; border-bottom: 3px solid transparent; color: #cfd2cc; font: 700 20px var(--titols); text-transform: uppercase; letter-spacing: .03em; padding: 6px 14px 8px; cursor: pointer; margin-bottom: -1px; }
+#entra .pestanyes button[aria-selected="true"] { color: #fff; border-bottom-color: #ff2a14; }
+#entra fieldset, #rols fieldset { border: 0; padding: 0; margin: 0 0 12px; }
+#entra legend { font: 700 15px var(--titols); text-transform: uppercase; letter-spacing: .04em; color: #cfd2cc; margin-bottom: 6px; }
+#nou-membres { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.camp { display: flex; flex-direction: column; gap: 5px; font: 700 15px var(--titols); text-transform: uppercase; letter-spacing: .04em; color: #cfd2cc; margin-bottom: 12px; }
+.camp.membre { margin: 0; }
+.camp.membre span { font-size: 13px; color: #9ea29c; }
+#nota input:not([type]), #nota input[name="membre"], #rols select { font: 18px var(--text); text-transform: none; letter-spacing: 0; background: #1b1d1f; color: #fff; border: 1px solid #5c5f5f; padding: 8px 10px; border-radius: 0; }
+#nota input::placeholder { color: #7d817c; }
+#nota input:focus-visible, #rols select:focus-visible { border-color: #fff; }
+#nota .avis { min-height: 1.4em; margin: 0 0 8px; font-size: 15px; color: #ffb3a8; }
+#nota .accions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+#nota .accions button, #codi button { background: #1b1d1f; border: 1px solid #5c5f5f; color: #fff; font: 700 18px var(--titols); text-transform: uppercase; padding: 9px 16px; cursor: pointer; }
+#nota .accions .principal { background: #ff2a14; border-color: #ff2a14; }
+#nota .accions button:hover, #nota .accions button:focus-visible { border-color: #fff; }
+#nota .accions button:disabled { opacity: .45; cursor: default; }
+#entra > .enllac { margin-top: 2px; }
+
+#rols h3 { margin: 0 0 4px; font: 700 30px var(--titols); text-transform: uppercase; }
+#rols-missio { color: #cfd2cc; }
+.rols-fila { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: end; margin-bottom: 14px; }
+.rol { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; border: 1px solid #5c5f5f; background: #131516; }
+.rol-nom { font: 700 28px/1 var(--titols); text-transform: uppercase; letter-spacing: .03em; color: #fff; }
+.rol:first-child .rol-nom { color: #ff3b2a; }
+.rol-desc { font-size: 15px; color: #cfd2cc; margin-bottom: 4px; }
+#inverteix { width: 48px; height: 48px; display: grid; place-items: center; background: #1b1d1f; border: 1px solid #5c5f5f; color: #fff; cursor: pointer; margin-bottom: 14px; }
+#inverteix:hover, #inverteix:focus-visible { border-color: #fff; background: #2a2d30; }
+#inverteix svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+#rols-afegeix { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
+#rols-afegeix[hidden] { display: none; }
+#rols-afegeix label { display: flex; flex-direction: column; gap: 4px; font: 700 13px var(--titols); text-transform: uppercase; letter-spacing: .05em; color: #9ea29c; }
+#rols-afegeix input { font-size: 16px !important; padding: 6px 8px !important; }
+
+.seccio h3 .compte { font: 700 14px var(--titols); color: #9ea29c; margin-top: 2px; }
+.seccio[data-oberta="false"] h3 { color: #7d817c; }
+.seccio[data-oberta="false"] h3 b { color: #6b3a33; }
+.nivell[data-bloquejada="true"] { background: #101112; border-color: #2e3131; color: #7d817c; cursor: not-allowed; }
+.nivell[data-bloquejada="true"]:hover { background: #101112; border-color: #2e3131; }
+.nivell .bloc { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.cadenat { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.nivell[data-superada="true"] { border-color: #2f8a52; background: #12201a; }
+.nivell strong { display: flex; align-items: center; gap: 6px; }
+.nivell .fet { width: 16px; height: 9px; border-left: 3px solid #35ff77; border-bottom: 3px solid #35ff77; transform: rotate(-45deg) translateY(-3px); }
+.nivell .millor { color: #8dffb4; font-weight: 700; }
+.nivell[data-superada="true"]:hover .millor, .nivell[data-superada="true"]:focus-visible .millor { color: #fff; }
+.xip.tancat { opacity: .45; cursor: not-allowed; }
+.xip.tancat .cadenat { margin-right: -2px; }
+#codi { display: grid; gap: 4px; }
+#codi .accions { justify-content: flex-end; }
+@media (max-width: 640px) { .rols-fila { grid-template-columns: 1fr; } #inverteix { justify-self: center; margin: 0; transform: rotate(90deg); } .nivell .millor { display: block !important; font-size: 11px; } }
+/* Amb l'equip ja triat, la presentació s'amaga i les missions caben sense desplaçar. */
+body:not([data-panell="entra"]):not([data-panell="carregant"]) #nota-text .intro { display: none; }
+body:not([data-panell="entra"]):not([data-panell="carregant"]) #nota h2 { font-size: clamp(34px, 5vw, 48px); margin-bottom: 4px; }
+body:not([data-panell="entra"]):not([data-panell="carregant"]) #nota .lema { margin-bottom: 10px; font-size: 20px; }
+.nivell .bloc { flex: 1; align-self: stretch; justify-content: center; }
+.nivell .bloc .cadenat { width: 22px; height: 22px; }
+.seccio[data-oberta="false"] h3 .compte { color: #8a6b66; font-size: 13px; }

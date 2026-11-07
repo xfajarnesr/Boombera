@@ -18,7 +18,12 @@ Joc d'aula per parelles, en català. Qui desactiva veu la bomba a la pantalla, q
 - `site/motor/`: l'escena 3D, les peces comunes dels mòduls i el so, generat al navegador.
 - `site/vendor/`: la biblioteca Three.js.
 - `site/manual/`: el manual imprimible. El joc no hi enllaça.
-- `tests/`: comprova les regles i juga partides reals al navegador. Cada mòdul té les seves proves a `tests/moduls/`.
+- `site/dades/`: equips, partides i progrés. `nucli.js` és la lògica de les dades (la fan servir el joc, el full de càlcul i les proves) i `dades.js`, la part del navegador, amb la cua de partides per enviar.
+- `site/comu/config.js`: l'adreça de l'Apps Script. Si és buida, les dades es desen només al navegador.
+- `site/comu/codis.js`: les empremtes dels codis del professorat, fetes amb `scripts/codis.js`. Els codis no són al repositori.
+- `site/tauler/`: el tauler del professorat. El joc no hi enllaça.
+- `apps-script/`: el servidor del full de càlcul i com posar-lo en marxa ([LLEGEIX-ME](apps-script/LLEGEIX-ME.md)).
+- `tests/`: comprova les regles i les dades, i juga partides reals al navegador. Cada mòdul té les seves proves a `tests/moduls/`. `tests/fals-google.js` fa córrer l'Apps Script de debò sobre un full de mentida.
 
 ## Proves en local
 
