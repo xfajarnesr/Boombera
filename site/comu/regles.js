@@ -114,7 +114,7 @@
     { primer: 'blau', pregunta: 'El número de sèrie és primer?', test: (b) => esPrimer(b.numero), si: 'tercer', no: 'penultim' },
     { primer: 'groc', pregunta: 'Hi ha més de 2 piles?', test: (b) => b.piles > 2, si: 'primer', no: 'segon' },
     { primer: 'verd', pregunta: 'El total de cables és senar?', test: (b) => b.cables.length % 2 === 1, si: 'mig', no: 'ultim' },
-    { primer: 'negre', pregunta: 'La suma de xifres és múltiple de 3?', test: (b) => sumaXifres(b.numero) % 3 === 0, si: 'primerNoNegre', no: 'ultim' },
+    { primer: 'negre', pregunta: 'La suma de xifres del número de sèrie és múltiple de 3?', test: (b) => sumaXifres(b.numero) % 3 === 0, si: 'primerNoNegre', no: 'ultim' },
   ];
 
   const REGLES_BOTO = [

@@ -1,6 +1,6 @@
 // Generat per scripts/app.js (npm run app): no l'editis a mà.
 // Guarda el joc per jugar sense connexió. No toca les crides al full de càlcul, ni el manual ni el tauler.
-const VERSIO = 'b28edf312022';
+const VERSIO = '5fdeb95e1ee9';
 const MEMORIA = 'boombera-' + VERSIO;
 const FITXERS = [
   "./",
