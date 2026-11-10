@@ -15,8 +15,9 @@
   (window.ManualModuls = window.ManualModuls || {}).sequencia = (R, esc) => {
     const C = R.SEQUENCIA;
     const exemple = { piles: 2, numero: 47 };
-    const flaix = C.anell[0];
-    const r = R.respostaSequencia(exemple, flaix, 1);
+    const flaixos = [C.anell[0], C.anell[3]];
+    const tecles = flaixos.map((f) => R.respostaSequencia(exemple, f, 0));
+    const tecles1 = flaixos.map((f) => R.respostaSequencia(exemple, f, 1));
     return `
   <h2 class="primer-titol">Mòdul de seqüència</h2>
   <p class="to">La llum parla en clau. Tu tens la clau, però no la llum.</p>
@@ -24,8 +25,10 @@
     <div>
       <p>La lent fa uns flaixos de colors, i qui desactiva te'ls ha de cantar. Tu li dius quines tecles ha de prémer, en el mateix ordre. Hi ha ${C.rondes.length} rondes, de ${esc(C.rondes.join(', ').replace(/, (\d+)$/, ' i $1'))} flaixos. Cada ronda repeteix els flaixos de l'anterior i n'hi afegeix.</p>
       <p><strong>Salts:</strong> piles + errors comesos fins ara, a qualsevol mòdul.<br><strong>Sentit:</strong> horari si el número de sèrie és parell, antihorari si és senar.</p>
-      <p>Mou-te per l'anell des del color del flaix i demana la tecla on arribes. Amb ${exemple.piles} piles, 1 error i la sèrie ${exemple.numero} hi ha ${R.saltsSequencia(exemple, 1)} salts en sentit ${R.sentitSequencia(exemple)}, i un flaix ${flaix} vol dir prémer ${esc(r)}.</p>
-      <p>Una tecla equivocada és un error i repeteix la ronda. Cada error, sigui on sigui, afegeix un salt: refeu el càlcul.</p>
+      <p><strong>Cada flaix, una tecla.</strong> Cal contestar tots els flaixos de la ronda, un per un i en el mateix ordre: si la lent en fa ${C.rondes[0]}, es premen ${C.rondes[0]} tecles. Cada flaix es tradueix des del seu propi color, no des del flaix anterior ni des de la tecla premuda.</p>
+      <p>Exemple: amb ${exemple.piles} piles, cap error i la sèrie ${exemple.numero} hi ha ${R.saltsSequencia(exemple, 0)} salts en sentit ${R.sentitSequencia(exemple)}. Si la lent fa <strong>${esc(flaixos.join(', '))}</strong>, cal prémer <strong>${esc(tecles[0])}</strong> (pel ${esc(flaixos[0])}) i després <strong>${esc(tecles[1])}</strong> (pel ${esc(flaixos[1])}).</p>
+      <p>Una tecla bona no encén res de nou: passeu al flaix següent. Si l'Agent s'atura uns segons, la lent torna a fer la ronda, però les tecles bones ja compten: seguiu on éreu.</p>
+      <p>Una tecla equivocada és un error i la ronda torna a començar des del primer flaix. Cada error, sigui on sigui, afegeix un salt: refeu el càlcul. A l'exemple, amb 1 error, caldria prémer ${esc(tecles1[0])} i ${esc(tecles1[1])}.</p>
     </div>
     ${anell(C.anell)}
   </div>`;
